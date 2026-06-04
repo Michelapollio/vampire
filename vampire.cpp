@@ -59,6 +59,8 @@
 
 #include "FMB/ModelCheck.hpp"
 
+#include "F02Fragment/Classifier.hpp"
+
 using namespace std;
 
 /**
@@ -451,6 +453,21 @@ void axiomSelectionMode(Problem* problem)
   vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
 }
 
+void fo2Mode(Problem* problem)
+{
+  ScopedPtr<Problem> prb(problem);
+
+  bool ok = FO2Fragment::Classifier::isFO2(prb->units());
+
+  if (ok) {
+    std::cout << "FO2\n";
+    vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
+  } else {
+    std::cout << "NOT_FO2\n";
+    vampireReturnValue = VAMP_RESULT_STATUS_UNKNOWN;
+  }
+}
+
 void dispatchByMode(Problem* problem)
 {
   switch (env.options->mode())
@@ -547,6 +564,9 @@ void dispatchByMode(Problem* problem)
 
   case Options::Mode::TPREPROCESS:
     preprocessMode(problem,true);
+    break;
+  case Options::Mode::FO2:
+    fo2Mode(problem);
     break;
   }
 }

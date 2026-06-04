@@ -164,6 +164,7 @@ set(SOURCES
     FMB/Monotonicity.hpp
     FMB/SortInference.cpp
     FMB/SortInference.hpp
+    F02Fragment/Classifier.cpp
     Indexing/AcyclicityIndex.cpp
     Indexing/AcyclicityIndex.hpp
     Indexing/ClauseCodeTree.cpp

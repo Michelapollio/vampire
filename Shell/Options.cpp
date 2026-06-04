@@ -120,11 +120,12 @@ void Options::init()
 
     _mode = ChoiceOptionValue<Mode>("mode","",Mode::VAMPIRE,
                                     {"axiom_selection",
-                                        "casc",
-                                        "clausify",
-                                        "consequence_elimination",
-                                        "model_check",
-                                        "output",
+                              "casc",
+                                      "clausify",
+                                      "consequence_elimination",
+                                      "model_check",
+                                      "fo2",
+                                      "output",
                                         "portfolio",
                                         "preprocess",
                                         "preprocess2",
@@ -143,6 +144,7 @@ void Options::init()
     "  -preprocess,axiom_selection,clausify: modes for producing output\n      for other solvers.\n"
     "  -tpreprocess,tclausify: output modes for theory input (clauses are quantified\n      with sort information).\n"
     "  -output,profile: output information about the problem\n"
+    "  -fo2: check whether input problems belong to the FO2 fragment (first-order two-variable fragment)\n"
     "Some modes are not currently maintained (get in touch if interested):\n"
     "  -bpa: perform bound propagation\n"
     "  -consequence_elimination: perform consequence elimination\n";
