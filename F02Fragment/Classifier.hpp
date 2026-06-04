@@ -10,7 +10,9 @@ class Classifier {
 public:
   //Classifier() {}
     //analizza l'intera UnitList restituita dal parser
-  static bool isFO2(UnitList *ul);
+    //ritorna true se il problema appartiene al frammento a due variabili
+    //e imposta `hasEq` se sono presenti letterali di uguaglianza
+    static bool isFO2(UnitList *ul, bool &hasEq);
 
 private:
  //analisi ricorsiva per formula (FOF)

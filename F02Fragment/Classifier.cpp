@@ -13,23 +13,21 @@ using namespace Kernel;
  * restituita dal parser e verifica se l'intero problema 
  * è nel frammento F02. Efettua controllo su tutte le unità (formule o clausole)
  */
-bool FO2Fragment::Classifier::isFO2(UnitList *ul) {
+bool FO2Fragment::Classifier::isFO2(UnitList *ul, bool &hasEq) {
     UnitList::Iterator it(ul);
+
+    // accumulatore per la presenza di uguaglianze su tutto il problema
+    hasEq = false;
 
     while (it.hasNext()){
         Unit *u = it.next();
 
-        // controllo se l'unità corrente è una clausola CNF
+        // insieme delle variabili per l'unità corrente
         DHSet<unsigned> vars;
-        bool hasEq = false;
         bool ok = true;
 
         if(u->isClause()){
-            //DHSet<unsigned> vars;
-            //bool hasEq = false;
-            
-            ok = isFO2Clause(u->asClause(), vars, hasEq); //se non è una clausola F02, l'intero problema non è F02
-            
+            ok = isFO2Clause(u->asClause(), vars, hasEq); // se non è una clausola F02, l'intero problema non è F02
         }
         else {
             ok = isFO2Formula(u->getFormula(), vars, hasEq);

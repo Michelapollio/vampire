@@ -457,10 +457,14 @@ void fo2Mode(Problem* problem)
 {
   ScopedPtr<Problem> prb(problem);
 
-  bool ok = FO2Fragment::Classifier::isFO2(prb->units());
+  bool hasEq = false;
+  bool ok = FO2Fragment::Classifier::isFO2(prb->units(), hasEq);
 
   if (ok) {
-    std::cout << "FO2\n";
+    std::cout << "FO2";
+    if (hasEq) std::cout << " (has equality)";
+    else if (!hasEq) std::cout << " (no equality)";
+    std::cout << "\n";
     vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
   } else {
     std::cout << "NOT_FO2\n";
