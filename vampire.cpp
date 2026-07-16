@@ -59,7 +59,9 @@
 
 #include "FMB/ModelCheck.hpp"
 
-#include "F02Fragment/Classifier.hpp"
+#include "F02Fragment/FO2Classifier.hpp"
+#include "F02Fragment/FO2Preprocessor.hpp"
+#include "F02Fragment/RemoveEquality.hpp"
 
 using namespace std;
 
@@ -457,6 +459,22 @@ void fo2Mode(Problem* problem)
 {
   ScopedPtr<Problem> prb(problem);
 
+
+  //FO2Fragment::RemoveEquality::traceProblem(*prb);
+
+  std::cout << "--- PRIMA DEL LEMMA 1 ---" << std::endl;
+  for (UnitList::Iterator it(prb->units()); it.hasNext();) {
+      std::cout << it.next()->toString() << std::endl;
+  }
+
+  FO2Fragment::RemoveEquality::applyLemma1(*prb);
+
+  std::cout << "--- DOPO IL LEMMA 1 ---" << std::endl;
+  for (UnitList::Iterator it(prb->units()); it.hasNext();) {
+      std::cout << it.next()->toString() << std::endl;
+  }
+  //FO2Preprocessor::Preprocessor::preprocess(*prb);
+
   bool hasEq = false;
   bool ok = FO2Fragment::Classifier::isFO2(prb->units(), hasEq);
 
@@ -470,6 +488,7 @@ void fo2Mode(Problem* problem)
     std::cout << "NOT_FO2\n";
     vampireReturnValue = VAMP_RESULT_STATUS_UNKNOWN;
   }
+
 }
 
 void dispatchByMode(Problem* problem)

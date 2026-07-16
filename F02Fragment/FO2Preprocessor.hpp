@@ -7,15 +7,19 @@
 #include "Shell/Flattening.hpp"
 #include "Shell/Skolem.hpp"
 
-using namespace std;
-using namespace Shell;
+namespace FO2Preprocessor {
 
-class Preprocessor {
-    public:
-    static void preprocess(Problem& prb);
-    static bool containsAllVariables(const DHSet<unsigned>& vars, const DHSet<unsigned>& required);
-    static bool coversAllVariables(const Term* t, const DHSet<unsigned>& clauseVars);
-    static bool hasMaximalLiteral(Clause* cl, const DHSet<unsigned>& clauseVars);
-    static bool validateClause(Clause* cl, const char*& errorMessage);
+  using namespace Shell;
+  using namespace Kernel;
 
-};
+  class Preprocessor {
+  public:
+    static void preprocess(Problem &prb);
+
+  private:
+    static bool containsAllVariables(const DHSet<unsigned> &vars, const DHSet<unsigned> &required);
+    static bool coversAllVariables(const Term *t, const DHSet<unsigned> &clauseVars);
+    static bool hasMaximalLiteral(Clause *cl, const DHSet<unsigned> &clauseVars);
+    static bool validateClause(Clause *cl, const char *&errorMessage);
+  };
+} // namespace FO2Preprocessor

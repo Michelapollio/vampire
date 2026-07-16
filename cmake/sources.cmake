@@ -165,6 +165,8 @@ set(SOURCES
     FMB/SortInference.cpp
     FMB/SortInference.hpp
     F02Fragment/Classifier.cpp
+    F02Fragment/FO2Preprocessor.cpp
+    F02Fragment/RemoveEquality.cpp
     Indexing/AcyclicityIndex.cpp
     Indexing/AcyclicityIndex.hpp
     Indexing/ClauseCodeTree.cpp
