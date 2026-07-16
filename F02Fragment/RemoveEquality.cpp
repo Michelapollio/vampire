@@ -63,20 +63,17 @@ Formula *replaceinAtomicFormula(Formula *formula, DHMap<unsigned, unsigned> &con
 
           std::string constName = env.signature->getFunction(constantFunctor)->name();
           std::string predName = "p_" + constName;
-          std::cout << "[1] ---\n";
+
           predicateFunctor = env.signature->addFreshPredicate(1, predName.c_str());
 
           constants.insert(constantFunctor, predicateFunctor);
-          std::cout << "[2] ---\n";
         }
 
         // Creiamo la variabile fresca per sostituire la costante
         unsigned freshVarIndex = i;
         TermList freshVar = TermList(freshVarIndex, false);
-        std::cout << "[3] ---\n";
 
         newArgs.push_back(freshVar);
-        std::cout << "[4] ---\n";
       }
       else {
         newArgs.push_back(arg);
@@ -89,11 +86,8 @@ Formula *replaceinAtomicFormula(Formula *formula, DHMap<unsigned, unsigned> &con
       numArgs,
       lit->polarity(),
       newArgs.data());
-  std::cout << "[5] ---\n";
 
   AtomicFormula *nuova = new AtomicFormula(modifiedLit);
-  // return new AtomicFormula(modifiedLit);
-  std::cout << "[6] ---\n";
   return nuova;
 }
 
@@ -286,13 +280,11 @@ void RemoveEquality::applyLemma1(Kernel::Problem &prb)
       Formula *originFormula = fu->formula();
 
       Formula *processedFormula = replaceInFormula(originFormula, constants);
-      std::cout << "[sono tornata qui ] ...\n";
 
       if (processedFormula != originFormula) {
         FormulaUnit *newUnit = new FormulaUnit(processedFormula, NonspecificInference1(InferenceRule::INPUT, unit));
         it.replace(newUnit);
       }
-      std::cout << "[7] ...\n";
     }
     else {
       Clause *cl = static_cast<Clause *>(unit);
@@ -306,7 +298,7 @@ void RemoveEquality::applyLemma1(Kernel::Problem &prb)
 
   if (!constants.isEmpty()) {
     UnitList *newUnits = UnitList::empty();
-    std::cout << "[8] ...\n";
+
     DHMap<unsigned, unsigned>::Iterator mit(constants);
     while (mit.hasNext()) {
       unsigned constantSymbolId;
@@ -314,14 +306,10 @@ void RemoveEquality::applyLemma1(Kernel::Problem &prb)
       mit.next(constantSymbolId, predicateSymbolId);
 
       Formula *uniquenessFormula = makeUniquenessAxiom(predicateSymbolId);
-      std::cout << "[9] ...\n";
       Unit *uniquenessUnit = new FormulaUnit(uniquenessFormula, Inference(InferenceRule::INPUT));
-      std::cout << "[10] ...\n";
       UnitList::push(uniquenessUnit, newUnits);
-      std::cout << "[11] ...\n";
     }
     prb.units() = UnitList::concat(newUnits, prb.units());
-    std::cout << "[12] ...\n";
   }
 }
 
