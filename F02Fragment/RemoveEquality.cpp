@@ -232,34 +232,25 @@ Unit *replaceInClause(Clause *cl, DHMap<unsigned, unsigned> &constants)
 {
   bool modified = false;
 
-  // Accumula i letterali processati come Formula*.
-  // Usiamo uno Stack<Formula*> nativo di Vampire.
   Stack<Formula *> processedLiterals;
 
   const unsigned len = cl->length();
   for (unsigned i = 0; i < len; ++i) {
     Literal *lit = (*cl)[i];
 
-    // Wrappa il letterale in una formula atomica per poterlo passare
-    // a replaceInFormula, che opera sul tipo Formula*.
     Formula *litFormula = new AtomicFormula(lit);
 
-    // Applica ricorsivamente la sostituzione costante->predicato.
     Formula *processedFormula = replaceInFormula(litFormula, constants);
 
     if (processedFormula != litFormula) {
-      // Il letterale è stato modificato: la clausola deve essere ricostruita.
-      // La formula atomica temporanea non viene riutilizzata: la liberiamo.
       delete litFormula;
       modified = true;
     }
     processedLiterals.push(processedFormula);
   }
 
-  // Caso 1: nessun letterale modificato → restituiamo la clausola originale
-  // senza allocare nuova memoria.
+ 
   if (!modified) {
-    // Distrugge le AtomicFormula temporanee non riutilizzate.
     while (!processedLiterals.isEmpty()) {
       delete processedLiterals.pop();
     }
@@ -267,21 +258,13 @@ Unit *replaceInClause(Clause *cl, DHMap<unsigned, unsigned> &constants)
   }
 
   // Caso 2: almeno un letterale modificato → costruiamo la disgiunzione.
-  // Utilizziamo JunctionFormula::generalJunction, il metodo idiomatico di Vampire
-  // per creare nodi OR/AND (gestisce correttamente i casi limite: lista vuota
-  // o singolo elemento).
   FormulaList *disjuncts = FormulaList::empty();
   while (!processedLiterals.isEmpty()) {
-    // Lo Stack è LIFO: inseriamo in testa per preservare l'ordine originale
-    // dopo il reverse implicito dato dall'uso push+generalJunction.
     FormulaList::push(processedLiterals.pop(), disjuncts);
   }
-  // generalJunction gestisce len==1 (restituisce il singolo elemento senza OR)
-  // e len==0 (restituisce Formula(false)), ma in pratica len >= 1 per clausole valide.
+  
   Formula *fullDisjunction = JunctionFormula::generalJunction(OR, disjuncts);
 
-  // Incapsula la disgiunzione in una FormulaUnit, tracciando che deriva dalla
-  // clausola originale tramite la regola INPUT.
   return new FormulaUnit(fullDisjunction,
                          NonspecificInference1(InferenceRule::INPUT, cl));
 }
