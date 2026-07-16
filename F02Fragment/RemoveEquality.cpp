@@ -1,5 +1,6 @@
 #include "RemoveEquality.hpp"
 
+
 #include "Kernel/Clause.hpp"
 #include "Kernel/Formula.hpp"
 #include "Kernel/FormulaUnit.hpp"
@@ -24,294 +25,7 @@ using namespace Kernel;
 using namespace Shell;
 
 namespace FO2Fragment {
-namespace {
 
-Formula *replaceinAtomicFormula(Formula *formula, DHMap<unsigned, unsigned> &constants)
-{
-  ASS(formula);
-  ASS_EQ(formula->connective(), LITERAL);
-
-  Literal *lit = formula->literal();
-
-  ASS(lit);
-
-  if (!lit) {
-    return formula;
-  }
-
-  unsigned numArgs = lit->arity();
-
-  // Contenitore per i nuovi argomenti modificati
-  std::vector<TermList> newArgs;
-  newArgs.reserve(numArgs);
-
-  for (unsigned i = 0; i < numArgs; ++i) {
-    TermList arg = *lit->nthArgument(i);
-
-    if (arg.isVar()) {
-      newArgs.push_back(arg); // Rimane invariata se è una variabile
-    }
-    else {
-      Term *t = arg.term();
-      if (t->arity() == 0) { // È una costante!
-        unsigned constantFunctor = t->functor();
-        unsigned predicateFunctor;
-
-        // Controllo se la costante è presente nella mappa di sostituzione
-        if (!constants.find(constantFunctor, predicateFunctor)) {
-          std::cout << "[TROVATA COSTANTE ] ---\n";
-
-          std::string constName = env.signature->getFunction(constantFunctor)->name();
-          std::string predName = "p_" + constName;
-
-          predicateFunctor = env.signature->addFreshPredicate(1, predName.c_str());
-
-          constants.insert(constantFunctor, predicateFunctor);
-        }
-
-        // Creiamo la variabile fresca per sostituire la costante
-        unsigned freshVarIndex = i;
-        TermList freshVar = TermList(freshVarIndex, false);
-
-        newArgs.push_back(freshVar);
-      }
-      else {
-        newArgs.push_back(arg);
-      }
-    }
-  }
-
-  Literal *modifiedLit = Literal::create(
-      lit->functor(),
-      numArgs,
-      lit->polarity(),
-      newArgs.data());
-
-  AtomicFormula *nuova = new AtomicFormula(modifiedLit);
-  return nuova;
-}
-
-Formula *makeUniquenessAxiom(unsigned predicateFunctor)
-{
-  std::cout << "\n--- GENERAZIONE ASSIOMA DI UNICITA' ---\n";
-
-  const TermList sort = AtomicSort::defaultSort();
-  TermList x = TermList::var(0);
-  TermList y = TermList::var(1);
-
-  // 1. Creazione delle foglie per l'implicazione
-  Formula *predY = new AtomicFormula(Literal::create1(predicateFunctor, true, y));
-  Formula *eq = new AtomicFormula(Literal::createEquality(true, x, y, sort));
-
-  // 2. Implicazione: p(y) -> x = y (Usiamo BinaryFormula, corretta per IMP)
-  Formula *implication = new BinaryFormula(Connective::IMP, predY, eq);
-  std::cout << "[Assioma Step 1] Implicazione (p(y) -> x=y): " << implication->toString() << "\n";
-
-  // 3. Quantificazione universale: ! [y] : (p(y) -> x = y)
-  Formula *universalY = new QuantifiedFormula(Connective::FORALL,
-                                              VSList::singleton({1u, sort}),
-                                              implication);
-  std::cout << "[Assioma Step 2] universalY (∀y ...): " << universalY->toString() << "\n";
-
-  // 4. Foglia per la congiunzione: p(x)
-  Formula *predX = new AtomicFormula(Literal::create1(predicateFunctor, true, x));
-
-  // 5. Congiunzione: p(x) & ! [y] : (p(y) -> x = y) (Usiamo JunctionFormula, corretta per AND)
-  FormulaList *andArgs = FormulaList::empty();
-  FormulaList::push(universalY, andArgs);
-  FormulaList::push(predX, andArgs);
-  Formula *conjunction = JunctionFormula::generalJunction(Connective::AND, andArgs);
-  std::cout << "[Assioma Step 3] Congiunzione (p(x) & ∀y ...): " << conjunction->toString() << "\n";
-
-  // 6. Quantificazione esistenziale: ? [x] : (p(x) & ! [y] : (p(y) -> x = y))
-  Formula *finalAxiom = new QuantifiedFormula(Connective::EXISTS,
-                                              VSList::singleton({0u, sort}),
-                                              conjunction);
-
-  std::cout << "[Assioma FINALE]: " << finalAxiom->toString() << "\n";
-  std::cout << "-------------------------------------------------\n\n";
-
-  return finalAxiom;
-}
-
-Formula *replaceInFormula(Formula *formula, DHMap<unsigned, unsigned> &constants)
-{
-  if (!formula)
-    return nullptr;
-
-  switch (formula->connective()) {
-    case LITERAL: {
-      // Caso base: formula atomica, sostituisco i termini
-      return replaceinAtomicFormula(formula, constants);
-      std::cout << "[return tutto ok] ---\n";
-    }
-    case IMP:
-    case IFF:
-    case XOR: {
-      Formula *oldLeft = formula->left();
-      Formula *oldRight = formula->right();
-
-      Formula *newLeft = replaceInFormula(oldLeft, constants);
-      Formula *newRight = replaceInFormula(oldRight, constants);
-
-      if (newLeft != oldLeft || newRight != oldRight) {
-        return new BinaryFormula(formula->connective(), newLeft, newRight);
-      }
-      else {
-        return formula;
-      }
-    }
-    case AND:
-    case OR: {
-      // Itera sugli argomenti della giunzione e sostituisce ricorsivamente.
-      // Ricostruisce la lista solo se almeno un argomento è cambiato.
-      FormulaList *args = formula->args();
-      FormulaList *newArgs = FormulaList::empty();
-      bool changed = false;
-
-      FormulaList::Iterator it(args);
-      while (it.hasNext()) {
-        Formula *arg = it.next();
-        Formula *newArg = replaceInFormula(arg, constants);
-        if (newArg != arg)
-          changed = true;
-        FormulaList::push(newArg, newArgs);
-      }
-      newArgs = FormulaList::reverse(newArgs);
-
-      if (changed) {
-        return new JunctionFormula(formula->connective(), newArgs);
-      }
-      else {
-        // Nessuna modifica: distruggi la lista temporanea e restituisci l'originale.
-        FormulaList::destroy(newArgs);
-        return formula;
-      }
-    }
-    case NOT: {
-      Formula *oldArg = formula->uarg();
-      Formula *newArg = replaceInFormula(oldArg, constants);
-
-      if (newArg != oldArg) {
-        return new NegatedFormula(newArg);
-      }
-      return formula;
-    }
-
-    case FORALL:
-    case EXISTS: {
-      std::cout << "[RICORSIONE] Entrato in FORALL/EXISTS\n";
-      Formula *oldSub = formula->qarg();
-      std::cout << "[RICORSIONE] Sto per chiamare replaceInFormula sulla sottoformula...\n";
-      Formula *newSub = replaceInFormula(oldSub, constants);
-
-      std::cout << "[RICORSIONE] Ritornato dalla sottoformula! Confronto i puntatori...\n";
-      if (newSub != oldSub) {
-        std::cout << "[RICORSIONE] La formula è cambiata, provo a creare QuantifiedFormula...\n";
-        Formula *ris = new QuantifiedFormula(formula->connective(), formula->vars(), newSub);
-        std::cout << "[RICORSIONE] QuantifiedFormula creata con successo!\n";
-        return ris;
-      }
-      else {
-        std::cout << "[RICORSIONE] La formula NON è cambiata, restituisco l'originale\n";
-        return formula;
-      }
-    }
-    default:
-      return formula;
-  }
-}
-
-Unit *replaceInClause(Clause *cl, DHMap<unsigned, unsigned> &constants)
-{
-  bool modified = false;
-
-  Stack<Formula *> processedLiterals;
-
-  const unsigned len = cl->length();
-  for (unsigned i = 0; i < len; ++i) {
-    Literal *lit = (*cl)[i];
-
-    Formula *litFormula = new AtomicFormula(lit);
-
-    Formula *processedFormula = replaceInFormula(litFormula, constants);
-
-    if (processedFormula != litFormula) {
-      delete litFormula;
-      modified = true;
-    }
-    processedLiterals.push(processedFormula);
-  }
-
- 
-  if (!modified) {
-    while (!processedLiterals.isEmpty()) {
-      delete processedLiterals.pop();
-    }
-    return cl;
-  }
-
-  // Caso 2: almeno un letterale modificato → costruiamo la disgiunzione.
-  FormulaList *disjuncts = FormulaList::empty();
-  while (!processedLiterals.isEmpty()) {
-    FormulaList::push(processedLiterals.pop(), disjuncts);
-  }
-  
-  Formula *fullDisjunction = JunctionFormula::generalJunction(OR, disjuncts);
-
-  return new FormulaUnit(fullDisjunction,
-                         NonspecificInference1(InferenceRule::INPUT, cl));
-}
-
-} // namespace
-
-void RemoveEquality::applyLemma1(Kernel::Problem &prb)
-{
-
-  DHMap<unsigned, unsigned> constants;
-  // UnitList *introducedUnits = 0;
-
-  UnitList::DelIterator it(prb.units());
-  while (it.hasNext()) {
-    Unit *unit = it.next();
-
-    if (!unit->isClause()) {
-      FormulaUnit *fu = static_cast<FormulaUnit *>(unit);
-      Formula *originFormula = fu->formula();
-
-      Formula *processedFormula = replaceInFormula(originFormula, constants);
-
-      if (processedFormula != originFormula) {
-        FormulaUnit *newUnit = new FormulaUnit(processedFormula, NonspecificInference1(InferenceRule::INPUT, unit));
-        it.replace(newUnit);
-      }
-    }
-    else {
-      Clause *cl = static_cast<Clause *>(unit);
-      Unit *processedUnit = replaceInClause(cl, constants);
-
-      if (processedUnit != cl) {
-        it.replace(processedUnit);
-      }
-    }
-  }
-
-  if (!constants.isEmpty()) {
-    UnitList *newUnits = UnitList::empty();
-
-    DHMap<unsigned, unsigned>::Iterator mit(constants);
-    while (mit.hasNext()) {
-      unsigned constantSymbolId;
-      unsigned predicateSymbolId;
-      mit.next(constantSymbolId, predicateSymbolId);
-
-      Formula *uniquenessFormula = makeUniquenessAxiom(predicateSymbolId);
-      Unit *uniquenessUnit = new FormulaUnit(uniquenessFormula, Inference(InferenceRule::INPUT));
-      UnitList::push(uniquenessUnit, newUnits);
-    }
-    prb.units() = UnitList::concat(newUnits, prb.units());
-  }
-}
 
 void RemoveEquality::applyLemma2(Kernel::Problem &prb)
 {
@@ -343,17 +57,21 @@ void RemoveEquality::removeEquality(Kernel::Problem &prb)
   if (!prb.hasEquality()) {
     return;
   }
-
+  std::cout << "--- PRIMA DEL LEMMA 1 ---" << std::endl;
+  for (UnitList::Iterator it(prb.units()); it.hasNext();) {
+    std::cout << it.next()->toString() << std::endl;
+  }
   applyLemma1(prb);
+  std::cout << "--- DOPO IL LEMMA 1 ---" << std::endl;
+  for (UnitList::Iterator it(prb.units()); it.hasNext();) {
+      std::cout << it.next()->toString() << std::endl;
+  }
   applyLemma2(prb);
   applyLemma3(prb);
   applyLemma4(prb);
   applyLemma5(prb);
   applyLemma6(prb);
 
-  if (!prb.hasEquality()) {
-    return;
-  }
 }
 
 // ============================================================

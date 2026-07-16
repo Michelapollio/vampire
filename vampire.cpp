@@ -462,23 +462,17 @@ void fo2Mode(Problem* problem)
 
   //FO2Fragment::RemoveEquality::traceProblem(*prb);
 
-  std::cout << "--- PRIMA DEL LEMMA 1 ---" << std::endl;
-  for (UnitList::Iterator it(prb->units()); it.hasNext();) {
-      std::cout << it.next()->toString() << std::endl;
-  }
+  
+  std::cout << "start Remove Equality" << std::endl;
+  FO2Fragment::RemoveEquality::removeEquality(*prb);
 
-  FO2Fragment::RemoveEquality::applyLemma1(*prb);
-
-  std::cout << "--- DOPO IL LEMMA 1 ---" << std::endl;
-  for (UnitList::Iterator it(prb->units()); it.hasNext();) {
-      std::cout << it.next()->toString() << std::endl;
-  }
+  
   //FO2Preprocessor::Preprocessor::preprocess(*prb);
 
-  bool hasEq = false;
-  bool ok = FO2Fragment::Classifier::isFO2(prb->units(), hasEq);
+  //bool hasEq = false;
+  //bool ok = FO2Fragment::Classifier::isFO2(prb->units(), hasEq);
 
-  if (ok) {
+  /*if (ok) {
     std::cout << "FO2";
     if (hasEq) std::cout << " (has equality)";
     else if (!hasEq) std::cout << " (no equality)";
@@ -487,7 +481,7 @@ void fo2Mode(Problem* problem)
   } else {
     std::cout << "NOT_FO2\n";
     vampireReturnValue = VAMP_RESULT_STATUS_UNKNOWN;
-  }
+  }*/
 
 }
 
