@@ -1,0 +1,222 @@
+#include "Lemma2.hpp"
+
+#include "Kernel/Clause.hpp"
+#include "Kernel/Formula.hpp"
+#include "Kernel/FormulaUnit.hpp"
+#include "Kernel/Problem.hpp"
+#include "Kernel/Term.hpp"
+#include "Kernel/Unit.hpp"
+#include "Kernel/SortHelper.hpp"
+
+#include "Lib/DHMap.hpp"
+#include "Lib/Stack.hpp"
+#include "Lib/Environment.hpp"
+
+#include <iostream>
+#include <string>
+
+using namespace Kernel;
+
+namespace FO2Fragment {
+
+namespace {
+
+void getFreeVars(Formula *formula, bool &hasX, bool &hasY)
+{
+  if (!formula)
+    return;
+
+  switch (formula->connective()) {
+    case LITERAL: {
+      Literal *lit = formula->literal();
+      unsigned ar = lit->arity();
+      for (unsigned i = 0; i < ar; ++i) {
+        TermList arg = *lit->nthArgument(i);
+        if (arg.isVar()) {
+          if (arg.var() == 0)
+            hasX = true;
+          if (arg.var() == 1)
+            hasY = true;
+        }
+      }
+      break;
+    }
+
+    case NOT:
+      getFreeVars(formula->uarg(), hasX, hasY);
+      break;
+
+    case IMP:
+    case IFF:
+    case XOR:
+      getFreeVars(formula->left(), hasX, hasY);
+      getFreeVars(formula->right(), hasX, hasY);
+      break;
+
+    case AND:
+    case OR: {
+      FormulaList::Iterator it(formula->args());
+      while (it.hasNext()) {
+        getFreeVars(it.next(), hasX, hasY);
+      }
+      break;
+    }
+
+    case FORALL:
+    case EXISTS: {
+      bool subX = false;
+      bool subY = false; 
+      getFreeVars(formula->qarg(), subX, subY);
+      break;
+    }
+
+    default:
+      break;
+  }
+}
+
+Formula *renameFormula(Formula *formula, Stack<Formula *> &newDefinitions)
+{
+  if (!formula)
+    return nullptr;
+
+  switch (formula->connective()) {
+    case LITERAL:
+      return formula;
+
+    case NOT: {
+      Formula *newArg = renameFormula(formula->uarg(), newDefinitions);
+      if (newArg != formula->uarg()) {
+        return new NegatedFormula(newArg);
+      }
+
+      return formula;
+    }
+
+    case IMP:
+    case IFF:
+    case XOR: {
+      Formula *newLeft = renameFormula(formula->left(), newDefinitions);
+      Formula *newRight = renameFormula(formula->right(), newDefinitions);
+      if (newLeft != formula->left() || newRight != formula->right()) {
+        return new BinaryFormula(formula->connective(), newLeft, newRight);
+      }
+      return formula;
+    }
+
+    case AND:
+    case OR: {
+      FormulaList *args = formula->args();
+      FormulaList *newArgs = FormulaList::empty();
+      bool changed = false;
+
+      FormulaList::Iterator it(args);
+      while (it.hasNext()) {
+        Formula *arg = it.next();
+        Formula *newArg = renameFormula(arg, newDefinitions);
+        if (newArg != arg)
+          changed = true;
+        FormulaList::push(newArg, newArgs);
+      }
+      newArgs = FormulaList::reverse(newArgs);
+
+      if (changed) {
+        return new JunctionFormula(formula->connective(), newArgs);
+      }
+
+      FormulaList::destroy(newArgs);
+      return formula;
+    }
+
+    case FORALL:
+    case EXISTS: {
+
+      Formula *processedSubf = renameFormula(formula->qarg(), newDefinitions);
+
+      bool hasX = false;
+      bool hasY = false;
+      getFreeVars(processedSubf, hasX, hasY);
+
+      if (processedSubf->connective() != LITERAL) {
+        std::cout << "sottoformula complessa : " << processedSubf->toString() << "\n";
+
+        unsigned arity = 0;
+        if (hasX)
+          arity++;
+        if (hasY)
+          arity++;
+
+        unsigned newPred = env.signature->addFreshPredicate(arity, "p_def");
+
+        Literal *newLit;
+        const TermList sort = AtomicSort::defaultSort();
+        if (arity == 1) {
+          if (hasX) {
+            TermList var = TermList::var(0);
+          }
+          else {
+            TermList var = TermList::var(1);
+          }
+        }
+        else if (arity == 2) {
+          newLit = Literal::createEquality(true, TermList::var(0), TermList::var(1), sort);
+          TermList args[2] = {TermList::var(0), TermList::var(1)};
+          newLit = Literal::create(newPred, arity, true, args);
+        }
+        else { // arity == 0
+          //newLit = Literal::create(newPred, 0, true, nullptr);
+        }
+
+        Formula *replacementAtom = new AtomicFormula(newLit);
+
+        // generazione delle definizioni
+
+      }
+    }
+    default:
+      return formula;
+  }
+  return formula;
+}
+
+} // namespace
+
+void Lemma2::applyLemma2(Kernel::Problem &prb)
+{
+
+  std::cout << "\n--- APPLICAZIONE LEMMA 2  ---\n";
+
+  Stack<Formula *> newDefinitions;
+
+  UnitList::DelIterator it(prb.units());
+  while (it.hasNext()) {
+    Unit *unit = it.next();
+
+    if (!unit->isClause()) {
+      FormulaUnit *fu = static_cast<FormulaUnit *>(unit);
+      Formula *originFormula = fu->formula();
+
+      Formula *processedFormula = renameFormula(originFormula, newDefinitions);
+
+      if (processedFormula != originFormula) {
+        FormulaUnit *newUnit = new FormulaUnit(processedFormula, NonspecificInference1(InferenceRule::INPUT, unit));
+        it.replace(newUnit);
+      }
+    }
+  }
+
+  if (!newDefinitions.isEmpty()) {
+    UnitList *newUnits = UnitList::empty();
+
+    while (!newDefinitions.isEmpty()) {
+      Formula *defFormula = newDefinitions.pop();
+      Unit *defUnit = new FormulaUnit(defFormula, Inference(InferenceRule::INPUT));
+      UnitList::push(defUnit, newUnits);
+    }
+    prb.units() = UnitList::concat(newUnits, prb.units());
+  }
+
+  std::cout << "--- FINE LEMMA 2 ---\n\n";
+}
+
+} // namespace FO2Fragment

@@ -13,7 +13,7 @@ namespace FO2Fragment {
 class RemoveEquality {
 public:
   static void removeEquality(Kernel::Problem& prb);
-  static void applyLemma1(Kernel::Problem& prb);
+  
 
   // Funzioni diagnostiche di tracing (sola lettura, non modificano il problema)
   static void traceProblem(Kernel::Problem& prb);
@@ -21,12 +21,12 @@ public:
   static void traceClause(Kernel::Clause* cl);
 
 private:
-  
-  static void applyLemma2(Kernel::Problem& prb);
-  static void applyLemma3(Kernel::Problem& prb);
-  static void applyLemma4(Kernel::Problem& prb);
-  static void applyLemma5(Kernel::Problem& prb);
-  static void applyLemma6(Kernel::Problem& prb);
+  static void Lemma1Application(Kernel::Problem& prb);
+  static void Lemma2Application(Kernel::Problem& prb);
+  static void Lemma3Application(Kernel::Problem& prb);
+  static void Lemma4Application(Kernel::Problem& prb);
+  static void Lemma5Application(Kernel::Problem& prb);
+  static void Lemma6Application(Kernel::Problem& prb);
 
 
 };
