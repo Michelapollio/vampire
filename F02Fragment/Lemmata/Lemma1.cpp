@@ -372,7 +372,7 @@ void Lemma1::applyLemma1(Kernel::Problem &prb)
       mit.next(constantSymbolId, predicateSymbolId);
 
       Formula *uniquenessFormula = makeUniquenessAxiom(predicateSymbolId);
-      Unit *uniquenessUnit = new FormulaUnit(uniquenessFormula, Inference(InferenceRule::INPUT));
+      Unit *uniquenessUnit = new FormulaUnit(uniquenessFormula, Inference(FromInput(UnitInputType::AXIOM)));
       UnitList::push(uniquenessUnit, newUnits);
     }
     prb.units() = UnitList::concat(newUnits, prb.units());

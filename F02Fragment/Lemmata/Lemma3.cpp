@@ -23,12 +23,7 @@ namespace FO2Fragment {
 namespace {
 
 /**
- * Classificazione di un letterale di uguaglianza per il Lemma 3.
- * NOT_EQUALITY: Non e' un letterale di uguaglianza
- * TAUTOLOGY_TRUE: x = x (sempre vero -> la clausola diventa tautologia)
- * CONTRADICTION_FALSE: x != x (sempre falso -> il letterale puo' essere rimosso)
- * POS_DISTINCT_EQ: x = y con x != y (uguaglianza positiva estratta nel prefisso)
- * NEG_DISTINCT_EQ: x != y con x != y (uguaglianza negativa sostituita con neq(x,y))
+ * @brief Classifica un letterale di uguaglianza per il Lemma 3.
  */
 enum class EqualityType {
   NOT_EQUALITY,
@@ -38,9 +33,8 @@ enum class EqualityType {
   NEG_DISTINCT_EQ
 };
 
-
 /**
- * Analizza e classifica un letterale rispetto all'uguaglianza.
+ * @brief Analizza e classifica un letterale rispetto all'uguaglianza.
  */
 EqualityType classifyEqualityLiteral(const Literal *lit)
 {
@@ -68,7 +62,7 @@ EqualityType classifyEqualityLiteral(const Literal *lit)
 }
 
 /**
- * Stato globale del Lemma 3.
+ * @brief Gestisce lo stato globale del Lemma 3 per la creazione del predicato neq.
  */
 struct Lemma3State {
   unsigned neqPredicate = 0;
@@ -84,13 +78,7 @@ struct Lemma3State {
 };
 
 /**
- * Funzione 2: Trasforma una clausola isolando/rimuovendo le uguaglianze.
- * 
- * @param clauseFormula   Formula rappresentante la clausola (AtomicFormula, NOT o JunctionFormula(OR, ...)).
- * @param state           Stato globale per il tracciamento del predicato neq.
- * @param isTautology     Output: impostato a true se la clausola contiene x = x.
- * @param hasPositiveEq   Output: impostato a true se la clausola contiene x = y (var distinte).
- * @return                Formula della clausola pulita (senza uguaglianze) o nullptr se tautologia.
+ * @brief Trasforma una clausola isolando e rimuovendo i letterali di uguaglianza.
  */
 Formula *transformClauseEquality(Formula *clauseFormula, Lemma3State &state, bool &isTautology, bool &hasPositiveEq)
 {
@@ -132,6 +120,7 @@ Formula *transformClauseEquality(Formula *clauseFormula, Lemma3State &state, boo
 
     switch (eqType) {
       case EqualityType::TAUTOLOGY_TRUE:
+        std::cout << "[Lemma 3] Trovata tautologia (x = x), la clausola viene scartata.\n";
         isTautology = true;
         FormulaList::destroy(cleanLiterals);
         if (createdList) {
@@ -140,13 +129,16 @@ Formula *transformClauseEquality(Formula *clauseFormula, Lemma3State &state, boo
         return nullptr;
 
       case EqualityType::CONTRADICTION_FALSE:
+        std::cout << "[Lemma 3] Rimosso letterale contraddittorio (x != x).\n";
         break;
 
       case EqualityType::POS_DISTINCT_EQ:
+        std::cout << "[Lemma 3] Estratta uguaglianza positiva (x = y) nel prefisso implicativo.\n";
         hasPositiveEq = true;
         break;
 
       case EqualityType::NEG_DISTINCT_EQ: {
+        std::cout << "[Lemma 3] Sostituita uguaglianza negativa (x != y) con predicato neq(x,y).\n";
         unsigned neqFunctor = state.getNeqPredicate();
         TermList args[2] = {*lit->nthArgument(0), *lit->nthArgument(1)};
         Literal *neqLit = Literal::create(neqFunctor, 2, true, args);
@@ -170,14 +162,8 @@ Formula *transformClauseEquality(Formula *clauseFormula, Lemma3State &state, boo
   return JunctionFormula::generalJunction(OR, cleanLiterals);
 }
 
-
 /**
- * Funzione 3: Processa il corpo CNF di una sottoformula (alpha_i) pulendo tutte le clausole dalle uguaglianze.
- * 
- * @param cnfFormula      Il corpo CNF della formula.
- * @param state           Stato globale.
- * @param hasPositiveEq   Output: segnala se almeno una clausola conteneva x = y.
- * @return                Il nuovo corpo CNF pulito senza uguaglianze.
+ * @brief Processa il corpo CNF di una sottoformula pulendo le sue clausole dalle uguaglianze.
  */
 Formula *processCNFBody(Formula *cnfFormula, Lemma3State &state, bool &hasPositiveEq)
 {
@@ -222,7 +208,7 @@ Formula *processCNFBody(Formula *cnfFormula, Lemma3State &state, bool &hasPositi
 }
 
 /**
- * Estrae le clausole da una formula CNF pulita per il merging del Tipo 3.
+ * @brief Estrae le clausole da una formula CNF pulita per il merging del Tipo 3.
  */
 void extractClauses(Formula *cnfFormula, FormulaList *&targetList)
 {
@@ -239,7 +225,7 @@ void extractClauses(Formula *cnfFormula, FormulaList *&targetList)
 }
 
 /**
- * Costruisce l'assioma di anti-riflessivita' per neq: ∀x (¬neq(x, x))
+ * @brief Costruisce l'assioma di anti-riflessività per neq: ∀x (¬neq(x, x)).
  */
 Formula *createNeqReflexivityAxiom(unsigned neqFunctor)
 {
@@ -257,7 +243,7 @@ Formula *createNeqReflexivityAxiom(unsigned neqFunctor)
 } // namespace
 
 /**
- * Funzione Principale: Applica il Lemma 3 al problema
+ * @brief Applica il Lemma 3 al problema trasformando le uguaglianze ed isolandole.
  */
 void Lemma3::applyLemma3(Kernel::Problem &prb)
 {
@@ -278,6 +264,7 @@ void Lemma3::applyLemma3(Kernel::Problem &prb)
       ScottType stype = determineScottType(formula);
 
       if (stype == ScottType::TYPE_3) {
+        std::cout << "[Lemma 3] Elaborazione formula Tipo 3: " << formula->toString().substr(0, 60) << "...\n";
         Formula *body = formula;
         if (formula->connective() == FORALL) {
           body = formula->qarg();
@@ -296,6 +283,7 @@ void Lemma3::applyLemma3(Kernel::Problem &prb)
         it.del();
       }
       else {
+        std::cout << "[Lemma 3] Elaborazione formula Tipo 1/2: " << formula->toString().substr(0, 60) << "...\n";
         Formula *body = formula->qarg();
         bool hasPosEq = false;
 
@@ -319,6 +307,7 @@ void Lemma3::applyLemma3(Kernel::Problem &prb)
       }
     }
     else {
+      std::cout << "[Lemma 3] Elaborazione clausola: " << unit->toString() << "\n";
       Clause *cl = static_cast<Clause *>(unit);
       FormulaList *lits = FormulaList::empty();
       for (unsigned i = 0; i < cl->length(); ++i) {
@@ -350,6 +339,7 @@ void Lemma3::applyLemma3(Kernel::Problem &prb)
     Formula *type3Body = mergedCNF;
 
     if (type3HasPositiveEq) {
+      std::cout << "[Lemma 3] Aggiunto prefisso implicativo (x != y => ...) alla formula Tipo 3 unificata.\n";
       Literal *eqLit = Literal::createEquality(true, TermList::var(0), TermList::var(1), sort);
       Formula *eqAtom = new AtomicFormula(eqLit);
       type3Body = new BinaryFormula(IMP, new NegatedFormula(eqAtom), mergedCNF);
@@ -358,22 +348,23 @@ void Lemma3::applyLemma3(Kernel::Problem &prb)
     Formula *forallY = new QuantifiedFormula(FORALL, VSList::singleton({1u, sort}), type3Body);
     Formula *forallX = new QuantifiedFormula(FORALL, VSList::singleton({0u, sort}), forallY);
 
-    Unit *type3Unit = new FormulaUnit(forallX, Inference(InferenceRule::INPUT));
+    Unit *type3Unit = new FormulaUnit(forallX, Inference(FromInput(UnitInputType::AXIOM)));
     
     UnitList *unitWrapper = UnitList::empty();
     UnitList::push(type3Unit, unitWrapper);
     prb.units() = UnitList::concat(prb.units(), unitWrapper);
+    std::cout << "[Lemma 3] Generata formula unificata di Tipo 3: " << forallX->toString() << "\n";
   }
 
   if (state.requiresNeqAxiom) {
     Formula *axiomFormula = createNeqReflexivityAxiom(state.getNeqPredicate());
-    Unit *axiomUnit = new FormulaUnit(axiomFormula, Inference(InferenceRule::INPUT));
+    Unit *axiomUnit = new FormulaUnit(axiomFormula, Inference(FromInput(UnitInputType::AXIOM)));
 
     UnitList *axiomWrapper = UnitList::empty();
     UnitList::push(axiomUnit, axiomWrapper);
     prb.units() = UnitList::concat(axiomWrapper, prb.units());
 
-    std::cout << "[Lemma 3] Iniettato assioma per neq: " << axiomFormula->toString() << "\n";
+    std::cout << "[Lemma 3] Iniettato assioma di anti-riflessivita' per neq: " << axiomFormula->toString() << "\n";
   }
 
   std::cout << "--- FINE LEMMA 3 ---\n\n";

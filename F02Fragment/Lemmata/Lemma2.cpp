@@ -130,7 +130,6 @@ Formula *renameFormula(Formula *formula, Stack<Formula *> &newDefinitions)
 
     case FORALL:
     case EXISTS: {
-
       Formula *processedSubf = renameFormula(formula->qarg(), newDefinitions);
 
       bool hasX = false;
@@ -141,31 +140,42 @@ Formula *renameFormula(Formula *formula, Stack<Formula *> &newDefinitions)
         std::cout << "sottoformula complessa : " << processedSubf->toString() << "\n";
 
         unsigned arity = 0;
-        if (hasX)
-          arity++;
-        if (hasY)
-          arity++;
+        if (hasX) arity++;
+        if (hasY) arity++;
 
         unsigned newPred = env.signature->addFreshPredicate(arity, "p_def");
+        const TermList sort = AtomicSort::defaultSort();
 
         Literal *newLit = nullptr;
         if (arity == 1) {
           TermList var = hasX ? TermList::var(0) : TermList::var(1);
           newLit = Literal::create1(newPred, true, var);
-        }
-        else if (arity == 2) {
+        } else if (arity == 2) {
           TermList args[2] = {TermList::var(0), TermList::var(1)};
           newLit = Literal::create(newPred, arity, true, args);
-        }
-        else {
+        } else {
           newLit = Literal::create(newPred, true, {});
         }
 
-        Formula *replacementAtom = new AtomicFormula(newLit);
-        (void)replacementAtom; // Evita il warning unused variable in attesa che vengano generate le definizioni
+        // Costruiamo la formula di definizione: ∀[vars]. (p_def(vars) <=> sottoformula)
+        Formula* defAtom = new AtomicFormula(newLit);
+        Formula* biconditional = new BinaryFormula(IFF, defAtom, processedSubf);
 
+        Formula* defFormula = biconditional;
+        if (hasY) {
+          defFormula = new QuantifiedFormula(FORALL, VSList::singleton({1u, sort}), defFormula);
+        }
+        if (hasX) {
+          defFormula = new QuantifiedFormula(FORALL, VSList::singleton({0u, sort}), defFormula);
+        }
+
+        newDefinitions.push(defFormula);
+
+        // Sostituiamo la sottoformula complessa con il nuovo atomo
+        Formula *replacementAtom = new AtomicFormula(newLit);
+        return new QuantifiedFormula(formula->connective(), formula->vars(), replacementAtom);
       }
-      
+
       if (processedSubf != formula->qarg()) {
         return new QuantifiedFormula(formula->connective(), formula->vars(), processedSubf);
       }
@@ -208,7 +218,7 @@ void Lemma2::applyLemma2(Kernel::Problem &prb)
 
     while (!newDefinitions.isEmpty()) {
       Formula *defFormula = newDefinitions.pop();
-      Unit *defUnit = new FormulaUnit(defFormula, Inference(InferenceRule::INPUT));
+      Unit *defUnit = new FormulaUnit(defFormula, Inference(FromInput(UnitInputType::AXIOM)));
       UnitList::push(defUnit, newUnits);
     }
     prb.units() = UnitList::concat(newUnits, prb.units());
