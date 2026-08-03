@@ -16,24 +16,22 @@ using namespace Kernel;
 bool FO2Fragment::Classifier::isFO2(UnitList *ul, bool &hasEq) {
     UnitList::Iterator it(ul);
 
-    // accumulatore per la presenza di uguaglianze su tutto il problema
     hasEq = false;
 
     while (it.hasNext()){
         Unit *u = it.next();
 
-        // insieme delle variabili per l'unità corrente
         DHSet<unsigned> vars;
         bool ok = true;
 
         if(u->isClause()){
-            ok = isFO2Clause(u->asClause(), vars, hasEq); // se non è una clausola F02, l'intero problema non è F02
+            ok = isFO2Clause(u->asClause(), vars, hasEq);
         }
         else {
             ok = isFO2Formula(u->getFormula(), vars, hasEq);
         }
 
-        if(!ok) return false; // se una unità non è FO2, l'intero problema non è FO2
+        if(!ok) return false;
     }
     return true;
 }
@@ -53,7 +51,7 @@ bool FO2Fragment::Classifier::isFO2(UnitList *ul, bool &hasEq) {
             FormulaList::Iterator it(f->args());
             while (it.hasNext()){
                 if (!isFO2Formula(it.next(), varSet, hasEq)) {
-                    return false; // se una delle formule argomento non è F02, la formula non è F02
+                    return false;
                 }
             }
             return true;
@@ -83,7 +81,7 @@ bool FO2Fragment::Classifier::isFO2(UnitList *ul, bool &hasEq) {
         case IFF:
             return isFO2Formula(f->left(), varSet, hasEq) && isFO2Formula(f->right(), varSet, hasEq);
         case LITERAL: {
-            const Literal* lit = f->literal();  //chiamo literal() così da verificare che la formula è atomica, se non lo è -> asserzione
+            const Literal* lit = f->literal();
             if (!lit) return false;
             if (lit->isEquality()) hasEq = true;
             for (unsigned i = 0; i < (unsigned)lit->arity(); ++i) {
@@ -95,8 +93,7 @@ bool FO2Fragment::Classifier::isFO2(UnitList *ul, bool &hasEq) {
                 } else if (tl->isTerm()) {
                     const Term* t = tl->term();
                     if (!t) return false;
-                    if (t->arity() > 0) return false; // funzione non ammessa
-                    // constante (arity==0) ammessa
+                    if (t->arity() > 0) return false;
                 } else {
                     return false;
                 }
@@ -105,14 +102,14 @@ bool FO2Fragment::Classifier::isFO2(UnitList *ul, bool &hasEq) {
         }
         case FALSE:
         case TRUE:
-            return true; // costanti booleane sono ammesse
+            return true;
 
         default:
             return false;
     }
  }
 
- //Literal::isEquality()
+
 
  /**
   * Analisi delle clausole CNF
@@ -124,7 +121,7 @@ bool FO2Fragment::Classifier::isFO2(UnitList *ul, bool &hasEq) {
     bool FO2Fragment::Classifier::isFO2Clause(Clause* clause, DHSet<unsigned> &vars, bool &hasEq) {
 
      for (unsigned i = 0; i < clause->length(); ++i) {
-        vars.reset(); // resetto l'insieme delle variabili per ogni letterale
+        vars.reset();
         const Literal* lit = (*clause)[i];
         if (!lit) return false;
         if (lit->isEquality()) {
@@ -139,8 +136,7 @@ bool FO2Fragment::Classifier::isFO2(UnitList *ul, bool &hasEq) {
             } else if (tl->isTerm()) {
                 const Term* t = tl->term();
                 if (!t) return false;
-                if (t->arity() > 0) return false; // funzione non ammessa
-                // costante ammessa
+                if (t->arity() > 0) return false;
             } else {
                 return false;
             }

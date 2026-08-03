@@ -148,30 +148,28 @@ Formula *renameFormula(Formula *formula, Stack<Formula *> &newDefinitions)
 
         unsigned newPred = env.signature->addFreshPredicate(arity, "p_def");
 
-        Literal *newLit;
-        const TermList sort = AtomicSort::defaultSort();
+        Literal *newLit = nullptr;
         if (arity == 1) {
-          if (hasX) {
-            TermList var = TermList::var(0);
-          }
-          else {
-            TermList var = TermList::var(1);
-          }
+          TermList var = hasX ? TermList::var(0) : TermList::var(1);
+          newLit = Literal::create1(newPred, true, var);
         }
         else if (arity == 2) {
-          newLit = Literal::createEquality(true, TermList::var(0), TermList::var(1), sort);
           TermList args[2] = {TermList::var(0), TermList::var(1)};
           newLit = Literal::create(newPred, arity, true, args);
         }
-        else { // arity == 0
-          //newLit = Literal::create(newPred, 0, true, nullptr);
+        else {
+          newLit = Literal::create(newPred, true, {});
         }
 
         Formula *replacementAtom = new AtomicFormula(newLit);
-
-        // generazione delle definizioni
+        (void)replacementAtom; // Evita il warning unused variable in attesa che vengano generate le definizioni
 
       }
+      
+      if (processedSubf != formula->qarg()) {
+        return new QuantifiedFormula(formula->connective(), formula->vars(), processedSubf);
+      }
+      return formula;
     }
     default:
       return formula;

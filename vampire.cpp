@@ -482,7 +482,7 @@ void fo2Mode(Problem* problem)
     std::cout << "NOT_FO2\n";
     vampireReturnValue = VAMP_RESULT_STATUS_UNKNOWN;
   }*/
-
+  vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
 }
 
 void dispatchByMode(Problem* problem)

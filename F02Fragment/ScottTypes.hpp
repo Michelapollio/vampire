@@ -12,9 +12,9 @@ namespace FO2Fragment {
  * - TYPE_3: Ax Ay. alpha_i(x,y)
  */
 enum class ScottType {
-  TYPE_1, // Ex. alpha(x)
-  TYPE_2, // Ax Ey. alpha(x,y)
-  TYPE_3  // Ax Ay. alpha(x,y)
+  TYPE_1,
+  TYPE_2,
+  TYPE_3
 };
 
 /**

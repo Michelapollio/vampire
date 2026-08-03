@@ -38,7 +38,7 @@ Formula *replaceInEquality(Literal *lit, DHMap<unsigned, unsigned> &constants)
 
   std::cout << " [2 inizio analisi termine sinistro ]" << "\n";
 
-  // 1. Analisi del termine sinistro: deve essere un termine ordinario (!isVar) e avere arità 0
+
   if (!left.isVar() && env.signature->getFunction(left.term()->functor())->arity() == 0) {
     std::cout << " [TROVATA COSTANTE IN UGUAGLIANZA (SX)] ---\n";
     unsigned constantFunctor = left.term()->functor();
@@ -51,13 +51,13 @@ Formula *replaceInEquality(Literal *lit, DHMap<unsigned, unsigned> &constants)
       constants.insert(constantFunctor, predicateFunctor);
     }
 
-    left = TermList::var(0); // Sostituiamo provvisoriamente con la variabile X0
+    left = TermList::var(0);
     changed = true;
   }
 
   std::cout << " [3 inizio analisi termine destro ]" << "\n";
 
-  // 2. Analisi del termine destro: deve essere un termine ordinario (!isVar) e avere arità 0
+
   if (!right.isVar() && env.signature->getFunction(right.term()->functor())->arity() == 0) {
     std::cout << " [TROVATA COSTANTE IN UGUAGLIANZA (DX)] ---\n";
     unsigned constantFunctor = right.term()->functor();
@@ -70,18 +70,18 @@ Formula *replaceInEquality(Literal *lit, DHMap<unsigned, unsigned> &constants)
       constants.insert(constantFunctor, predicateFunctor);
     }
 
-    right = TermList::var(1); // Sostituiamo provvisoriamente con la variabile X1
+    right = TermList::var(1);
     changed = true;
   }
 
-  // Se l'uguaglianza è stata modificata, creiamo l'atomo e lo restituiamo
+
   if (changed) {
     const TermList sort = AtomicSort::defaultSort();
     Literal *modifiedEq = Literal::createEquality(lit->polarity(), left, right, sort);
     return new AtomicFormula(modifiedEq);
   }
 
-  // Se era un'uguaglianza ma non conteneva costanti (es: X0 = X1)
+
   return nullptr;
 }
 
@@ -109,7 +109,7 @@ Formula *replaceinAtomicFormula(Formula *formula, DHMap<unsigned, unsigned> &con
 
   unsigned numArgs = lit->arity();
 
-  // Contenitore per i nuovi argomenti modificati
+
   std::vector<TermList> newArgs;
   newArgs.reserve(numArgs);
 
@@ -117,15 +117,15 @@ Formula *replaceinAtomicFormula(Formula *formula, DHMap<unsigned, unsigned> &con
     TermList arg = *lit->nthArgument(i);
 
     if (arg.isVar()) {
-      newArgs.push_back(arg); // Rimane invariata se è una variabile
+      newArgs.push_back(arg);
     }
     else {
       Term *t = arg.term();
-      if (t->arity() == 0) { // È una costante!
+      if (t->arity() == 0) {
         unsigned constantFunctor = t->functor();
         unsigned predicateFunctor;
 
-        // Controllo se la costante è presente nella mappa di sostituzione
+
         if (!constants.find(constantFunctor, predicateFunctor)) {
           std::cout << "[TROVATA COSTANTE ] ---\n";
 
@@ -137,7 +137,7 @@ Formula *replaceinAtomicFormula(Formula *formula, DHMap<unsigned, unsigned> &con
           constants.insert(constantFunctor, predicateFunctor);
         }
 
-        // Creiamo la variabile fresca per sostituire la costante
+
         unsigned freshVarIndex = i;
         TermList freshVar = TermList(freshVarIndex, false);
 
@@ -167,31 +167,31 @@ Formula *makeUniquenessAxiom(unsigned predicateFunctor)
   TermList x = TermList::var(0);
   TermList y = TermList::var(1);
 
-  // 1. Creazione delle foglie per l'implicazione
+
   Formula *predY = new AtomicFormula(Literal::create1(predicateFunctor, true, y));
   Formula *eq = new AtomicFormula(Literal::createEquality(true, x, y, sort));
 
-  // 2. Implicazione: p(y) -> x = y (Usiamo BinaryFormula, corretta per IMP)
+
   Formula *implication = new BinaryFormula(Connective::IMP, predY, eq);
   std::cout << "[Assioma Step 1] Implicazione (p(y) -> x=y): " << implication->toString() << "\n";
 
-  // 3. Quantificazione universale: ! [y] : (p(y) -> x = y)
+
   Formula *universalY = new QuantifiedFormula(Connective::FORALL,
                                               VSList::singleton({1u, sort}),
                                               implication);
   std::cout << "[Assioma Step 2] universalY (∀y ...): " << universalY->toString() << "\n";
 
-  // 4. Foglia per la congiunzione: p(x)
+
   Formula *predX = new AtomicFormula(Literal::create1(predicateFunctor, true, x));
 
-  // 5. Congiunzione: p(x) & ! [y] : (p(y) -> x = y) (Usiamo JunctionFormula, corretta per AND)
+
   FormulaList *andArgs = FormulaList::empty();
   FormulaList::push(universalY, andArgs);
   FormulaList::push(predX, andArgs);
   Formula *conjunction = JunctionFormula::generalJunction(Connective::AND, andArgs);
   std::cout << "[Assioma Step 3] Congiunzione (p(x) & ∀y ...): " << conjunction->toString() << "\n";
 
-  // 6. Quantificazione esistenziale: ? [x] : (p(x) & ! [y] : (p(y) -> x = y))
+
   Formula *finalAxiom = new QuantifiedFormula(Connective::EXISTS,
                                               VSList::singleton({0u, sort}),
                                               conjunction);
@@ -209,7 +209,7 @@ Formula *replaceInFormula(Formula *formula, DHMap<unsigned, unsigned> &constants
 
   switch (formula->connective()) {
     case LITERAL: {
-      // Caso base: formula atomica, sostituisco i termini
+
       return replaceinAtomicFormula(formula, constants);
       std::cout << "[return tutto ok] ---\n";
     }
@@ -231,8 +231,7 @@ Formula *replaceInFormula(Formula *formula, DHMap<unsigned, unsigned> &constants
     }
     case AND:
     case OR: {
-      // Itera sugli argomenti della giunzione e sostituisce ricorsivamente.
-      // Ricostruisce la lista solo se almeno un argomento è cambiato.
+
       FormulaList *args = formula->args();
       FormulaList *newArgs = FormulaList::empty();
       bool changed = false;
@@ -251,7 +250,7 @@ Formula *replaceInFormula(Formula *formula, DHMap<unsigned, unsigned> &constants
         return new JunctionFormula(formula->connective(), newArgs);
       }
       else {
-        // Nessuna modifica: distruggi la lista temporanea e restituisci l'originale.
+
         FormulaList::destroy(newArgs);
         return formula;
       }
@@ -318,7 +317,7 @@ Unit *replaceInClause(Clause *cl, DHMap<unsigned, unsigned> &constants)
     return cl;
   }
 
-  // Caso 2: almeno un letterale modificato → costruiamo la disgiunzione.
+
   FormulaList *disjuncts = FormulaList::empty();
   while (!processedLiterals.isEmpty()) {
     FormulaList::push(processedLiterals.pop(), disjuncts);
@@ -336,7 +335,7 @@ void Lemma1::applyLemma1(Kernel::Problem &prb)
 {
 
   DHMap<unsigned, unsigned> constants;
-  // UnitList *introducedUnits = 0;
+
 
   UnitList::DelIterator it(prb.units());
   while (it.hasNext()) {

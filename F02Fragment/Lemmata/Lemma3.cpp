@@ -24,18 +24,23 @@ namespace {
 
 /**
  * Classificazione di un letterale di uguaglianza per il Lemma 3.
+ * NOT_EQUALITY: Non e' un letterale di uguaglianza
+ * TAUTOLOGY_TRUE: x = x (sempre vero -> la clausola diventa tautologia)
+ * CONTRADICTION_FALSE: x != x (sempre falso -> il letterale puo' essere rimosso)
+ * POS_DISTINCT_EQ: x = y con x != y (uguaglianza positiva estratta nel prefisso)
+ * NEG_DISTINCT_EQ: x != y con x != y (uguaglianza negativa sostituita con neq(x,y))
  */
 enum class EqualityType {
-  NOT_EQUALITY,        // Non e' un letterale di uguaglianza
-  TAUTOLOGY_TRUE,      // x = x (sempre vero -> la clausola diventa tautologia)
-  CONTRADICTION_FALSE, // x != x (sempre falso -> il letterale puo' essere rimosso)
-  POS_DISTINCT_EQ,     // x = y con x != y (uguaglianza positiva estratta nel prefisso)
-  NEG_DISTINCT_EQ      // x != y con x != y (uguaglianza negativa sostituita con neq(x,y))
+  NOT_EQUALITY,
+  TAUTOLOGY_TRUE,
+  CONTRADICTION_FALSE,
+  POS_DISTINCT_EQ,
+  NEG_DISTINCT_EQ
 };
 
 
 /**
- * 1 Analizza e classifica un letterale rispetto all'uguaglianza.
+ * Analizza e classifica un letterale rispetto all'uguaglianza.
  */
 EqualityType classifyEqualityLiteral(const Literal *lit)
 {
@@ -50,13 +55,11 @@ EqualityType classifyEqualityLiteral(const Literal *lit)
     unsigned var0 = arg0.var();
     unsigned var1 = arg1.var();
 
-    // Caso 1: Stessa variabile (x = x oppure x != x)
     if (var0 == var1) {
       return lit->isPositive() ? EqualityType::TAUTOLOGY_TRUE 
                                : EqualityType::CONTRADICTION_FALSE;
     }
 
-    // Caso 2: Variabili distinte (x = y oppure x != y)
     return lit->isPositive() ? EqualityType::POS_DISTINCT_EQ 
                              : EqualityType::NEG_DISTINCT_EQ;
   }
@@ -254,7 +257,7 @@ Formula *createNeqReflexivityAxiom(unsigned neqFunctor)
 } // namespace
 
 /**
- * Funzione Principale: Applica il Lemma 3 al problema fornito.
+ * Funzione Principale: Applica il Lemma 3 al problema
  */
 void Lemma3::applyLemma3(Kernel::Problem &prb)
 {
@@ -275,7 +278,6 @@ void Lemma3::applyLemma3(Kernel::Problem &prb)
       ScottType stype = determineScottType(formula);
 
       if (stype == ScottType::TYPE_3) {
-        // Raccogliamo tutte le formule di Tipo 3 per il merging finale
         Formula *body = formula;
         if (formula->connective() == FORALL) {
           body = formula->qarg();
@@ -291,10 +293,9 @@ void Lemma3::applyLemma3(Kernel::Problem &prb)
         }
 
         extractClauses(cleanBody, type3Clauses);
-        it.del(); // Rimuoviamo l'unita' individuale di Tipo 3 (verra' accorpata)
+        it.del();
       }
       else {
-        // Tipo 1 (Ex) oppure Tipo 2 (Ax Ey)
         Formula *body = formula->qarg();
         bool hasPosEq = false;
 
@@ -308,7 +309,7 @@ void Lemma3::applyLemma3(Kernel::Problem &prb)
           FormulaUnit *newUnit = new FormulaUnit(newForall, NonspecificInference1(InferenceRule::INPUT, unit));
           it.replace(newUnit);
         }
-        else { // Tipo 1
+        else {
           Formula *cleanBody = processCNFBody(body, state, hasPosEq);
           Formula *newQuant = new QuantifiedFormula(formula->connective(), formula->vars(), cleanBody);
 
@@ -318,7 +319,6 @@ void Lemma3::applyLemma3(Kernel::Problem &prb)
       }
     }
     else {
-      // Se e' una clausola piatta (trattata come Tipo 3 implicito Ax Ay)
       Clause *cl = static_cast<Clause *>(unit);
       FormulaList *lits = FormulaList::empty();
       for (unsigned i = 0; i < cl->length(); ++i) {
@@ -338,11 +338,10 @@ void Lemma3::applyLemma3(Kernel::Problem &prb)
         FormulaList::push(cleanClause, type3Clauses);
       }
 
-      it.del(); // Le clausole piatte vengono accorpate nella formula unica di Tipo 3
+      it.del();
     }
   }
 
-  // PASSAGGIO 2: Merging di tutte le unità di Tipo 3 in un'UNICA formula di Tipo 3
   if (!FormulaList::isEmpty(type3Clauses)) {
     type3Clauses = FormulaList::reverse(type3Clauses);
     Formula *mergedCNF = JunctionFormula::generalJunction(AND, type3Clauses);
@@ -350,14 +349,12 @@ void Lemma3::applyLemma3(Kernel::Problem &prb)
     const TermList sort = AtomicSort::defaultSort();
     Formula *type3Body = mergedCNF;
 
-    // Se almeno una clausola conteneva x = y, aggiungiamo x = y in disgiunzione nel corpo
     if (type3HasPositiveEq) {
       Literal *eqLit = Literal::createEquality(true, TermList::var(0), TermList::var(1), sort);
       Formula *eqAtom = new AtomicFormula(eqLit);
-      type3Body = new BinaryFormula(IMP, new NegatedFormula(eqAtom), mergedCNF); // (x=y v mergedCNF) => not(x=y) -> mergedCNF
+      type3Body = new BinaryFormula(IMP, new NegatedFormula(eqAtom), mergedCNF);
     }
 
-    // Prefisso: ∀x ∀y (type3Body)
     Formula *forallY = new QuantifiedFormula(FORALL, VSList::singleton({1u, sort}), type3Body);
     Formula *forallX = new QuantifiedFormula(FORALL, VSList::singleton({0u, sort}), forallY);
 
@@ -368,7 +365,6 @@ void Lemma3::applyLemma3(Kernel::Problem &prb)
     prb.units() = UnitList::concat(prb.units(), unitWrapper);
   }
 
-  // PASSAGGIO 3: Iniezione dell'assioma di anti-riflessivita' ∀x (¬neq(x,x)) se neq e' stato usato
   if (state.requiresNeqAxiom) {
     Formula *axiomFormula = createNeqReflexivityAxiom(state.getNeqPredicate());
     Unit *axiomUnit = new FormulaUnit(axiomFormula, Inference(InferenceRule::INPUT));
