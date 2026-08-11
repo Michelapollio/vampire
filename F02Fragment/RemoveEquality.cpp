@@ -22,6 +22,7 @@
 #include "Lemmata/Lemma2.hpp"
 #include "Lemmata/Lemma3.hpp"
 #include "Lemmata/Lemma4.hpp"
+#include "Lemmata/Lemma5.hpp"
 
 #include <iostream>
 #include <string>
@@ -53,7 +54,7 @@ void RemoveEquality::Lemma4Application(Kernel::Problem &prb)
 
 void RemoveEquality::Lemma5Application(Kernel::Problem &prb)
 {
-  (void)prb;
+  FO2Fragment::Lemmata::Lemma5::applyLemma5(prb);
 }
 
 void RemoveEquality::Lemma6Application(Kernel::Problem &prb)
@@ -91,6 +92,10 @@ void RemoveEquality::removeEquality(Kernel::Problem &prb)
       std::cout << it.next()->toString() << std::endl;
   }
   Lemma5Application(prb);
+  std::cout << "--- DOPO IL LEMMA 5 ---" << std::endl;
+  for (UnitList::Iterator it(prb.units()); it.hasNext();) {
+      std::cout << it.next()->toString() << std::endl;
+  }
   Lemma6Application(prb);
 }
 

@@ -255,14 +255,57 @@ void Lemma4::extractClausesFromBody(Kernel::Formula* body, Kernel::Unit* parent,
     }
 
     case IMP: {
-      Kernel::Literal* left  = formulaToLiteral(body->left());
-      Kernel::Literal* right = formulaToLiteral(body->right());
-      if (left && right) {
+      Kernel::Formula* left = body->left();
+      Kernel::Formula* right = body->right();
+      if (right->connective() == AND) {
+        Kernel::FormulaList::Iterator it(right->args());
+        while (it.hasNext()) {
+          Kernel::Formula* impSingle = new Kernel::BinaryFormula(IMP, left, it.next());
+          extractClausesFromBody(impSingle, parent, out);
+        }
+      } else {
         Lib::Stack<Kernel::Literal*> lits;
-        lits.push(Kernel::Literal::create(left, false));
-        lits.push(right);
-        Kernel::Inference inf(NonspecificInference1(InferenceRule::CLAUSIFY, parent));
-        out.push_back(Kernel::Clause::fromStack(lits, inf));
+        bool okLeft = false;
+        if (left->connective() == NOT && left->uarg()->connective() == LITERAL) {
+          lits.push(left->uarg()->literal());
+          okLeft = true;
+        } else if (left->connective() == LITERAL) {
+          lits.push(Kernel::Literal::create(left->literal(), false));
+          okLeft = true;
+        }
+        
+        if (okLeft) {
+          bool okRight = true;
+          std::vector<Kernel::Literal*> rLits;
+          if (right->connective() == LITERAL) {
+            rLits.push_back(right->literal());
+          } else if (right->connective() == NOT && right->uarg()->connective() == LITERAL) {
+            rLits.push_back(Kernel::Literal::create(right->uarg()->literal(), false));
+          } else if (right->connective() == OR) {
+            Kernel::FormulaList::Iterator it(right->args());
+            while (it.hasNext()) {
+              Kernel::Formula* arg = it.next();
+              if (arg->connective() == LITERAL) {
+                rLits.push_back(arg->literal());
+              } else if (arg->connective() == NOT && arg->uarg()->connective() == LITERAL) {
+                rLits.push_back(Kernel::Literal::create(arg->uarg()->literal(), false));
+              } else {
+                okRight = false;
+                break;
+              }
+            }
+          } else {
+            okRight = false;
+          }
+
+          if (okRight) {
+            for (Kernel::Literal* rlit : rLits) {
+              lits.push(rlit);
+            }
+            Kernel::Inference inf(NonspecificInference1(InferenceRule::CLAUSIFY, parent));
+            out.push_back(Kernel::Clause::fromStack(lits, inf));
+          }
+        }
       }
       break;
     }

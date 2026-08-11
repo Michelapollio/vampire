@@ -136,7 +136,7 @@ Formula *renameFormula(Formula *formula, Stack<Formula *> &newDefinitions)
       bool hasY = false;
       getFreeVars(processedSubf, hasX, hasY);
 
-      if (processedSubf->connective() != LITERAL) {
+      if (formula->connective() == EXISTS && processedSubf->connective() != LITERAL) {
         std::cout << "sottoformula complessa : " << processedSubf->toString() << "\n";
 
         unsigned arity = 0;
