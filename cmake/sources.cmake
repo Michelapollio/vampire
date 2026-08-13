@@ -174,6 +174,7 @@ set(SOURCES
     F02Fragment/Lemmata/Lemma3.cpp
     F02Fragment/Lemmata/Lemma4.cpp
     F02Fragment/Lemmata/Lemma5.cpp
+    F02Fragment/Lemmata/Lemma6.cpp
     Indexing/AcyclicityIndex.cpp
     Indexing/AcyclicityIndex.hpp
     Indexing/ClauseCodeTree.cpp

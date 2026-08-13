@@ -23,6 +23,7 @@
 #include "Lemmata/Lemma3.hpp"
 #include "Lemmata/Lemma4.hpp"
 #include "Lemmata/Lemma5.hpp"
+#include "Lemmata/Lemma6.hpp"
 #include "FO2Logger.hpp"
 
 #include <iostream>
@@ -60,7 +61,7 @@ void RemoveEquality::Lemma5Application(Kernel::Problem &prb)
 
 void RemoveEquality::Lemma6Application(Kernel::Problem &prb)
 {
-  (void)prb;
+  FO2Fragment::Lemmata::Lemma6::applyLemma6(prb);
 }
 
 void RemoveEquality::removeEquality(Kernel::Problem &prb)
@@ -88,6 +89,8 @@ void RemoveEquality::removeEquality(Kernel::Problem &prb)
 
   FO2Logger::logLemma("DOPO IL LEMMA 5", prb);
   Lemma6Application(prb);
+
+  FO2Logger::logLemma("DOPO IL LEMMA 6", prb);
 
   FO2Logger::logPhase("Rimozione dell'uguaglianza completata");
 }
