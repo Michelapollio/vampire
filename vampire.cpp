@@ -62,6 +62,7 @@
 #include "F02Fragment/FO2Classifier.hpp"
 #include "F02Fragment/FO2Preprocessor.hpp"
 #include "F02Fragment/RemoveEquality.hpp"
+#include "F02Fragment/FO2Logger.hpp"
 
 using namespace std;
 
@@ -459,33 +460,17 @@ void fo2Mode(Problem* problem)
 {
   ScopedPtr<Problem> prb(problem);
 
+  // Esempio di impostazione verbosità: QUIET, PHASES, LEMMATA, DEBUG
+  FO2Fragment::FO2Logger::setVerbosity(FO2Fragment::VerbosityLevel::LEMMATA);
 
-  //FO2Fragment::RemoveEquality::traceProblem(*prb);
-
-  
-  std::cout << "start Remove Equality" << std::endl;
+  FO2Fragment::FO2Logger::logPhase("start Remove Equality");
   FO2Fragment::RemoveEquality::removeEquality(*prb);
 
-  
-  //FO2Preprocessor::Preprocessor::preprocess(*prb);
-
-  //bool hasEq = false;
-  //bool ok = FO2Fragment::Classifier::isFO2(prb->units(), hasEq);
-
-  /*if (ok) {
-    std::cout << "FO2";
-    if (hasEq) std::cout << " (has equality)";
-    else if (!hasEq) std::cout << " (no equality)";
-    std::cout << "\n";
-    vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
-  } else {
-    std::cout << "NOT_FO2\n";
-    vampireReturnValue = VAMP_RESULT_STATUS_UNKNOWN;
-  }*/
   vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
 }
 
 void dispatchByMode(Problem* problem)
+
 {
   switch (env.options->mode())
   {

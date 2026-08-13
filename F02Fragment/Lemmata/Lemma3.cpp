@@ -14,8 +14,10 @@
 #include "Lib/List.hpp"
 #include "Lib/Environment.hpp"
 #include "Lib/Stack.hpp"
+#include "F02Fragment/FO2Logger.hpp"
 
 #include <iostream>
+#include <string>
 
 using namespace Kernel;
 
@@ -120,7 +122,7 @@ Formula *transformClauseEquality(Formula *clauseFormula, Lemma3State &state, boo
 
     switch (eqType) {
       case EqualityType::TAUTOLOGY_TRUE:
-        std::cout << "[Lemma 3] Trovata tautologia (x = x), la clausola viene scartata.\n";
+        FO2Logger::logDebug("[Lemma 3] Trovata tautologia (x = x), la clausola viene scartata.");
         isTautology = true;
         FormulaList::destroy(cleanLiterals);
         if (createdList) {
@@ -129,16 +131,16 @@ Formula *transformClauseEquality(Formula *clauseFormula, Lemma3State &state, boo
         return nullptr;
 
       case EqualityType::CONTRADICTION_FALSE:
-        std::cout << "[Lemma 3] Rimosso letterale contraddittorio (x != x).\n";
+        FO2Logger::logDebug("[Lemma 3] Rimosso letterale contraddittorio (x != x).");
         break;
 
       case EqualityType::POS_DISTINCT_EQ:
-        std::cout << "[Lemma 3] Estratta uguaglianza positiva (x = y) nel prefisso implicativo.\n";
+        FO2Logger::logDebug("[Lemma 3] Estratta uguaglianza positiva (x = y) nel prefisso implicativo.");
         hasPositiveEq = true;
         break;
 
       case EqualityType::NEG_DISTINCT_EQ: {
-        std::cout << "[Lemma 3] Sostituita uguaglianza negativa (x != y) con predicato neq(x,y).\n";
+        FO2Logger::logDebug("[Lemma 3] Sostituita uguaglianza negativa (x != y) con predicato neq(x,y).");
         unsigned neqFunctor = state.getNeqPredicate();
         TermList args[2] = {*lit->nthArgument(0), *lit->nthArgument(1)};
         Literal *neqLit = Literal::create(neqFunctor, 2, true, args);
@@ -247,7 +249,7 @@ Formula *createNeqReflexivityAxiom(unsigned neqFunctor)
  */
 void Lemma3::applyLemma3(Kernel::Problem &prb)
 {
-  std::cout << "\n--- INIZIO APPLICAZIONE LEMMA 3 ---\n";
+  FO2Logger::logDebug("[Lemma 3] INIZIO APPLICAZIONE LEMMA 3");
 
   Lemma3State state;
   FormulaList *type3Clauses = FormulaList::empty();
@@ -264,7 +266,7 @@ void Lemma3::applyLemma3(Kernel::Problem &prb)
       ScottType stype = determineScottType(formula);
 
       if (stype == ScottType::TYPE_3) {
-        std::cout << "[Lemma 3] Elaborazione formula Tipo 3: " << formula->toString().substr(0, 60) << "...\n";
+        FO2Logger::logDebug("[Lemma 3] Elaborazione formula Tipo 3: " + formula->toString().substr(0, 60) + "...");
         Formula *body = formula;
         if (formula->connective() == FORALL) {
           body = formula->qarg();
@@ -283,7 +285,7 @@ void Lemma3::applyLemma3(Kernel::Problem &prb)
         it.del();
       }
       else {
-        std::cout << "[Lemma 3] Elaborazione formula Tipo 1/2: " << formula->toString().substr(0, 60) << "...\n";
+        FO2Logger::logDebug("[Lemma 3] Elaborazione formula Tipo 1/2: " + formula->toString().substr(0, 60) + "...");
         Formula *body = formula->qarg();
         bool hasPosEq = false;
 
@@ -307,7 +309,7 @@ void Lemma3::applyLemma3(Kernel::Problem &prb)
       }
     }
     else {
-      std::cout << "[Lemma 3] Elaborazione clausola: " << unit->toString() << "\n";
+      FO2Logger::logDebug("[Lemma 3] Elaborazione clausola: " + unit->toString());
       Clause *cl = static_cast<Clause *>(unit);
       FormulaList *lits = FormulaList::empty();
       for (unsigned i = 0; i < cl->length(); ++i) {
@@ -339,7 +341,7 @@ void Lemma3::applyLemma3(Kernel::Problem &prb)
     Formula *type3Body = mergedCNF;
 
     if (type3HasPositiveEq) {
-      std::cout << "[Lemma 3] Aggiunto prefisso implicativo (x != y => ...) alla formula Tipo 3 unificata.\n";
+      FO2Logger::logDebug("[Lemma 3] Aggiunto prefisso implicativo (x != y => ...) alla formula Tipo 3 unificata.");
       Literal *eqLit = Literal::createEquality(true, TermList::var(0), TermList::var(1), sort);
       Formula *eqAtom = new AtomicFormula(eqLit);
       type3Body = new BinaryFormula(IMP, new NegatedFormula(eqAtom), mergedCNF);
@@ -353,7 +355,7 @@ void Lemma3::applyLemma3(Kernel::Problem &prb)
     UnitList *unitWrapper = UnitList::empty();
     UnitList::push(type3Unit, unitWrapper);
     prb.units() = UnitList::concat(prb.units(), unitWrapper);
-    std::cout << "[Lemma 3] Generata formula unificata di Tipo 3: " << forallX->toString() << "\n";
+    FO2Logger::logDebug("[Lemma 3] Generata formula unificata di Tipo 3: " + forallX->toString());
   }
 
   if (state.requiresNeqAxiom) {
@@ -364,10 +366,10 @@ void Lemma3::applyLemma3(Kernel::Problem &prb)
     UnitList::push(axiomUnit, axiomWrapper);
     prb.units() = UnitList::concat(axiomWrapper, prb.units());
 
-    std::cout << "[Lemma 3] Iniettato assioma di anti-riflessivita' per neq: " << axiomFormula->toString() << "\n";
+    FO2Logger::logDebug("[Lemma 3] Iniettato assioma di anti-riflessivita' per neq: " + axiomFormula->toString());
   }
 
-  std::cout << "--- FINE LEMMA 3 ---\n\n";
+  FO2Logger::logDebug("[Lemma 3] FINE LEMMA 3");
 }
 
 } // namespace FO2Fragment

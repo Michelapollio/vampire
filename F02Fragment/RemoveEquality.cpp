@@ -23,6 +23,7 @@
 #include "Lemmata/Lemma3.hpp"
 #include "Lemmata/Lemma4.hpp"
 #include "Lemmata/Lemma5.hpp"
+#include "FO2Logger.hpp"
 
 #include <iostream>
 #include <string>
@@ -67,36 +68,28 @@ void RemoveEquality::removeEquality(Kernel::Problem &prb)
   if (!prb.hasEquality()) {
     return;
   }
-  std::cout << "--- PRIMA DEL LEMMA 1 ---" << std::endl;
-  for (UnitList::Iterator it(prb.units()); it.hasNext();) {
-    std::cout << it.next()->toString() << std::endl;
-  }
+
+  FO2Logger::logPhase("Inizio procedura di rimozione dell'uguaglianza (RemoveEquality)");
+
+  FO2Logger::logLemma("PRIMA DEL LEMMA 1", prb);
   Lemma1Application(prb);
-  std::cout << "--- DOPO IL LEMMA 1 ---" << std::endl;
-  for (UnitList::Iterator it(prb.units()); it.hasNext();) {
-      std::cout << it.next()->toString() << std::endl;
-  }
+
+  FO2Logger::logLemma("DOPO IL LEMMA 1", prb);
   Lemma2Application(prb);
-  std::cout << "--- DOPO IL LEMMA 2 ---" << std::endl;
-  for (UnitList::Iterator it(prb.units()); it.hasNext();) {
-      std::cout << it.next()->toString() << std::endl;
-  }
+
+  FO2Logger::logLemma("DOPO IL LEMMA 2", prb);
   Lemma3Application(prb);
-  std::cout << "--- DOPO IL LEMMA 3 ---" << std::endl;
-  for (UnitList::Iterator it(prb.units()); it.hasNext();) {
-      std::cout << it.next()->toString() << std::endl;
-  }
+
+  FO2Logger::logLemma("DOPO IL LEMMA 3", prb);
   Lemma4Application(prb);
-  std::cout << "--- DOPO IL LEMMA 4 ---" << std::endl;
-  for (UnitList::Iterator it(prb.units()); it.hasNext();) {
-      std::cout << it.next()->toString() << std::endl;
-  }
+
+  FO2Logger::logLemma("DOPO IL LEMMA 4", prb);
   Lemma5Application(prb);
-  std::cout << "--- DOPO IL LEMMA 5 ---" << std::endl;
-  for (UnitList::Iterator it(prb.units()); it.hasNext();) {
-      std::cout << it.next()->toString() << std::endl;
-  }
+
+  FO2Logger::logLemma("DOPO IL LEMMA 5", prb);
   Lemma6Application(prb);
+
+  FO2Logger::logPhase("Rimozione dell'uguaglianza completata");
 }
 
 void RemoveEquality::traceProblem(Kernel::Problem &prb)

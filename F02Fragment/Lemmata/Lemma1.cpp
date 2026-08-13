@@ -16,6 +16,7 @@
 #include "Shell/Options.hpp"
 
 #include "Lib/Environment.hpp"
+#include "F02Fragment/FO2Logger.hpp"
 
 #include <iostream>
 #include <string>
@@ -28,7 +29,7 @@ namespace {
 
 Formula *replaceInEquality(Literal *lit, DHMap<unsigned, unsigned> &constants)
 {
-  std::cout << " [1 trovata uguaglianza ]" << "\n";
+  FO2Logger::logDebug(" [1 trovata uguaglianza ]");
   ASS(lit);
   ASS(lit->isEquality());
 
@@ -36,11 +37,11 @@ Formula *replaceInEquality(Literal *lit, DHMap<unsigned, unsigned> &constants)
   TermList right = *lit->nthArgument(1);
   bool changed = false;
 
-  std::cout << " [2 inizio analisi termine sinistro ]" << "\n";
+  FO2Logger::logDebug(" [2 inizio analisi termine sinistro ]");
 
 
   if (!left.isVar() && env.signature->getFunction(left.term()->functor())->arity() == 0) {
-    std::cout << " [TROVATA COSTANTE IN UGUAGLIANZA (SX)] ---\n";
+    FO2Logger::logDebug(" [TROVATA COSTANTE IN UGUAGLIANZA (SX)] ---");
     unsigned constantFunctor = left.term()->functor();
     unsigned predicateFunctor;
 
@@ -55,11 +56,11 @@ Formula *replaceInEquality(Literal *lit, DHMap<unsigned, unsigned> &constants)
     changed = true;
   }
 
-  std::cout << " [3 inizio analisi termine destro ]" << "\n";
+  FO2Logger::logDebug(" [3 inizio analisi termine destro ]");
 
 
   if (!right.isVar() && env.signature->getFunction(right.term()->functor())->arity() == 0) {
-    std::cout << " [TROVATA COSTANTE IN UGUAGLIANZA (DX)] ---\n";
+    FO2Logger::logDebug(" [TROVATA COSTANTE IN UGUAGLIANZA (DX)] ---");
     unsigned constantFunctor = right.term()->functor();
     unsigned predicateFunctor;
 
@@ -127,7 +128,7 @@ Formula *replaceinAtomicFormula(Formula *formula, DHMap<unsigned, unsigned> &con
 
 
         if (!constants.find(constantFunctor, predicateFunctor)) {
-          std::cout << "[TROVATA COSTANTE ] ---\n";
+          FO2Logger::logDebug("[TROVATA COSTANTE ] ---");
 
           std::string constName = env.signature->getFunction(constantFunctor)->name();
           std::string predName = "p_" + constName;
@@ -161,7 +162,7 @@ Formula *replaceinAtomicFormula(Formula *formula, DHMap<unsigned, unsigned> &con
 
 Formula *makeUniquenessAxiom(unsigned predicateFunctor)
 {
-  std::cout << "\n--- GENERAZIONE ASSIOMA DI UNICITA' ---\n";
+  FO2Logger::logDebug("\n--- GENERAZIONE ASSIOMA DI UNICITA' ---");
 
   const TermList sort = AtomicSort::defaultSort();
   TermList x = TermList::var(0);
@@ -173,13 +174,13 @@ Formula *makeUniquenessAxiom(unsigned predicateFunctor)
 
 
   Formula *implication = new BinaryFormula(Connective::IMP, predY, eq);
-  std::cout << "[Assioma Step 1] Implicazione (p(y) -> x=y): " << implication->toString() << "\n";
+  FO2Logger::logDebug("[Assioma Step 1] Implicazione (p(y) -> x=y): " + implication->toString());
 
 
   Formula *universalY = new QuantifiedFormula(Connective::FORALL,
                                               VSList::singleton({1u, sort}),
                                               implication);
-  std::cout << "[Assioma Step 2] universalY (∀y ...): " << universalY->toString() << "\n";
+  FO2Logger::logDebug("[Assioma Step 2] universalY (∀y ...): " + universalY->toString());
 
 
   Formula *predX = new AtomicFormula(Literal::create1(predicateFunctor, true, x));
@@ -189,15 +190,14 @@ Formula *makeUniquenessAxiom(unsigned predicateFunctor)
   FormulaList::push(universalY, andArgs);
   FormulaList::push(predX, andArgs);
   Formula *conjunction = JunctionFormula::generalJunction(Connective::AND, andArgs);
-  std::cout << "[Assioma Step 3] Congiunzione (p(x) & ∀y ...): " << conjunction->toString() << "\n";
+  FO2Logger::logDebug("[Assioma Step 3] Congiunzione (p(x) & ∀y ...): " + conjunction->toString());
 
 
   Formula *finalAxiom = new QuantifiedFormula(Connective::EXISTS,
                                               VSList::singleton({0u, sort}),
                                               conjunction);
 
-  std::cout << "[Assioma FINALE]: " << finalAxiom->toString() << "\n";
-  std::cout << "-------------------------------------------------\n\n";
+  FO2Logger::logDebug("[Assioma FINALE]: " + finalAxiom->toString());
 
   return finalAxiom;
 }
@@ -211,7 +211,6 @@ Formula *replaceInFormula(Formula *formula, DHMap<unsigned, unsigned> &constants
     case LITERAL: {
 
       return replaceinAtomicFormula(formula, constants);
-      std::cout << "[return tutto ok] ---\n";
     }
     case IMP:
     case IFF:
@@ -267,20 +266,20 @@ Formula *replaceInFormula(Formula *formula, DHMap<unsigned, unsigned> &constants
 
     case FORALL:
     case EXISTS: {
-      std::cout << "[RICORSIONE] Entrato in FORALL/EXISTS\n";
+      FO2Logger::logDebug("[RICORSIONE] Entrato in FORALL/EXISTS");
       Formula *oldSub = formula->qarg();
-      std::cout << "[RICORSIONE] Sto per chiamare replaceInFormula sulla sottoformula...\n";
+      FO2Logger::logDebug("[RICORSIONE] Sto per chiamare replaceInFormula sulla sottoformula...");
       Formula *newSub = replaceInFormula(oldSub, constants);
 
-      std::cout << "[RICORSIONE] Ritornato dalla sottoformula! Confronto i puntatori...\n";
+      FO2Logger::logDebug("[RICORSIONE] Ritornato dalla sottoformula! Confronto i puntatori...");
       if (newSub != oldSub) {
-        std::cout << "[RICORSIONE] La formula è cambiata, provo a creare QuantifiedFormula...\n";
+        FO2Logger::logDebug("[RICORSIONE] La formula è cambiata, provo a creare QuantifiedFormula...");
         Formula *ris = new QuantifiedFormula(formula->connective(), formula->vars(), newSub);
-        std::cout << "[RICORSIONE] QuantifiedFormula creata con successo!\n";
+        FO2Logger::logDebug("[RICORSIONE] QuantifiedFormula creata con successo!");
         return ris;
       }
       else {
-        std::cout << "[RICORSIONE] La formula NON è cambiata, restituisco l'originale\n";
+        FO2Logger::logDebug("[RICORSIONE] La formula NON è cambiata, restituisco l'originale");
         return formula;
       }
     }

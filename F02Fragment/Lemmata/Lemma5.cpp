@@ -11,9 +11,11 @@
 #include "Kernel/SortHelper.hpp"
 #include "Kernel/Inference.hpp"
 #include "Lib/Stack.hpp"
+#include "F02Fragment/FO2Logger.hpp"
 
 #include <iostream>
 #include <vector>
+#include <string>
 
 using namespace Kernel;
 
@@ -184,7 +186,7 @@ bool Lemma5::decomposeType3Clause(Kernel::Clause* cl, std::vector<Kernel::Litera
  */
 void Lemma5::applyLemma5(Kernel::Problem &prb)
 {
-  std::cout << "\n--- INIZIO APPLICAZIONE LEMMA 5 ---\n";
+  FO2Logger::logDebug("[Lemma 5] INIZIO APPLICAZIONE LEMMA 5");
 
   const Kernel::TermList sort = Kernel::AtomicSort::defaultSort();
   UnitList* newUnits = UnitList::empty();
@@ -210,7 +212,7 @@ void Lemma5::applyLemma5(Kernel::Problem &prb)
 
     if (canTransform) {
       transformedCount++;
-      std::cout << "[Lemma 5] Trasformazione unita' di Tipo 3 con uguaglianza: " << unit->toString() << "\n";
+      FO2Logger::logDebug("[Lemma 5] Trasformazione unita' di Tipo 3 con uguaglianza: " + unit->toString());
 
       Kernel::Formula* gammaX = createDisjunctionFromLiterals(gammaLits);
       Kernel::Formula* deltaX = createDisjunctionFromLiterals(deltaLits);
@@ -261,7 +263,7 @@ void Lemma5::applyLemma5(Kernel::Problem &prb)
       Kernel::FormulaList::push(ramo1, branches);
       Kernel::Formula* equivFormula = Kernel::JunctionFormula::generalJunction(Kernel::OR, branches);
 
-      std::cout << "[Lemma 5] Formula generata senza uguaglianza diretta: " << equivFormula->toString().substr(0, 80) << "...\n";
+      FO2Logger::logDebug("[Lemma 5] Formula generata senza uguaglianza diretta: " + equivFormula->toString().substr(0, 80) + "...");
 
       Kernel::Unit* newUnit = new Kernel::FormulaUnit(equivFormula, Kernel::Inference(Kernel::FromInput(Kernel::UnitInputType::AXIOM)));
       Kernel::UnitList::push(newUnit, newUnits);
@@ -273,8 +275,8 @@ void Lemma5::applyLemma5(Kernel::Problem &prb)
 
   prb.units() = Kernel::UnitList::reverse(newUnits);
 
-  std::cout << "[Lemma 5] Trasformazione completata. Clausole modificate: " << transformedCount << "\n";
-  std::cout << "--- FINE LEMMA 5 ---\n\n";
+  FO2Logger::logDebug("[Lemma 5] Trasformazione completata. Clausole modificate: " + std::to_string(transformedCount));
+  FO2Logger::logDebug("[Lemma 5] FINE LEMMA 5");
 }
 
 } // namespace Lemmata

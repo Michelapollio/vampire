@@ -10,10 +10,12 @@
 #include "Kernel/Unit.hpp"
 #include "Lib/Stack.hpp"
 #include "F02Fragment/ScottTypes.hpp"
+#include "F02Fragment/FO2Logger.hpp"
 #include <vector>
 #include <deque>
 #include <unordered_set>
 #include <iostream>
+#include <string>
 
 namespace FO2Fragment {
 namespace Lemmata {
@@ -174,7 +176,7 @@ void Lemma4::resolveRestricted(Kernel::Clause* clA, Kernel::Clause* clB, std::ve
         Kernel::Inference inf(Kernel::NonspecificInference2(Kernel::InferenceRule::RESOLUTION, clA, clB));
         Kernel::Clause* resolvent = Kernel::Clause::fromStack(resLits, inf);
 
-        std::cout << "[Lemma 4] Generato risolvente ristretto" << (needsSwap ? " (con scambio di variabili)" : "") << ": " << resolvent->toString() << "\n";
+        FO2Logger::logDebug("[Lemma 4] Generato risolvente ristretto" + std::string(needsSwap ? " (con scambio di variabili)" : "") + ": " + resolvent->toString());
         newResolvents.push_back(resolvent);
       }
     }
@@ -325,7 +327,7 @@ void Lemma4::extractType3Clauses(Kernel::FormulaUnit* fu, std::vector<Kernel::Cl
 
   size_t before = out.size();
   extractClausesFromBody(matrix, fu, out);
-  std::cout << "[Lemma 4] Estratte " << (out.size() - before) << " clausole da: " << fu->formula()->toString().substr(0, 60) << "...\n";
+  FO2Logger::logDebug("[Lemma 4] Estratte " + std::to_string(out.size() - before) + " clausole da: " + fu->formula()->toString().substr(0, 60) + "...");
 }
 
 /**
@@ -333,7 +335,7 @@ void Lemma4::extractType3Clauses(Kernel::FormulaUnit* fu, std::vector<Kernel::Cl
  */
 void Lemma4::applyLemma4(Kernel::Problem &prb)
 {
-  std::cout << "\n--- INIZIO APPLICAZIONE LEMMA 4 ---\n";
+  FO2Logger::logDebug("[Lemma 4] INIZIO APPLICAZIONE LEMMA 4");
 
   std::vector<Kernel::Clause*> clauses2;
   std::deque<Kernel::Clause*> passive3;
@@ -353,7 +355,7 @@ void Lemma4::applyLemma4(Kernel::Problem &prb)
           passive3.push_back(cl);
         }
       } else {
-        std::cout << "[Lemma 4] Formula Tipo 1/2 (non clausola, mantenuta): " << fu->toString().substr(0,50) << "...\n";
+        FO2Logger::logDebug("[Lemma 4] Formula Tipo 1/2 (non clausola, mantenuta): " + fu->toString().substr(0,50) + "...");
         nonClauseUnits.push_back(unit);
       }
     } else {
@@ -377,7 +379,7 @@ void Lemma4::applyLemma4(Kernel::Problem &prb)
     }
   }
 
-  std::cout << "[Lemma 4] Clausole Tipo 2: " << clauses2.size() << ", Clausole Tipo 3 (passive): " << passive3.size() << "\n";
+  FO2Logger::logDebug("[Lemma 4] Clausole Tipo 2: " + std::to_string(clauses2.size()) + ", Clausole Tipo 3 (passive): " + std::to_string(passive3.size()));
 
   std::unordered_set<Kernel::Clause*> known;
   for (auto* cl : passive3) known.insert(cl);
@@ -387,7 +389,7 @@ void Lemma4::applyLemma4(Kernel::Problem &prb)
     Kernel::Clause* given = passive3.front();
     passive3.pop_front();
 
-    std::cout << "[Lemma 4] Processo clausola data (Tipo 3): " << given->toString() << "\n";
+    FO2Logger::logDebug("[Lemma 4] Processo clausola data (Tipo 3): " + given->toString());
 
     std::vector<Kernel::Clause*> newResolvents;
 
@@ -403,7 +405,7 @@ void Lemma4::applyLemma4(Kernel::Problem &prb)
       if (known.find(res) == known.end()) {
         known.insert(res);
         clauses2.push_back(res);
-        std::cout << "[Lemma 4] Nuovo risolvente Tipo 2 salvato: " << res->toString() << "\n";
+        FO2Logger::logDebug("[Lemma 4] Nuovo risolvente Tipo 2 salvato: " + res->toString());
       }
     }
 
@@ -412,13 +414,13 @@ void Lemma4::applyLemma4(Kernel::Problem &prb)
     for (Kernel::Clause* res : newResolvents) {
       if (known.find(res) == known.end()) {
         known.insert(res);
-        std::cout << "[Lemma 4] Nuovo risolvente Tipo 3 in coda: " << res->toString() << "\n";
+        FO2Logger::logDebug("[Lemma 4] Nuovo risolvente Tipo 3 in coda: " + res->toString());
         passive3.push_back(res);
       }
     }
   }
 
-  std::cout << "[Lemma 4] Saturazione completata. Clausole Tipo 3 sature: " << active3.size() << "\n";
+  FO2Logger::logDebug("[Lemma 4] Saturazione completata. Clausole Tipo 3 sature: " + std::to_string(active3.size()));
 
   std::vector<Kernel::Clause*> phi4;
   for (Kernel::Clause* cl : active3) {
@@ -433,11 +435,11 @@ void Lemma4::applyLemma4(Kernel::Problem &prb)
     if (!hasBinaryNonEq) {
       phi4.push_back(cl);
     } else {
-      std::cout << "[Lemma 4] Clausola eliminata : " << cl->toString() << "\n";
+      FO2Logger::logDebug("[Lemma 4] Clausola eliminata : " + cl->toString());
     }
   }
 
-  std::cout << "[Lemma 4] (phi_4): " << phi4.size() << " clausole Tipo 3\n";
+  FO2Logger::logDebug("[Lemma 4] (phi_4): " + std::to_string(phi4.size()) + " clausole Tipo 3");
 
   UnitList* newUnits = UnitList::empty();
 
@@ -453,7 +455,7 @@ void Lemma4::applyLemma4(Kernel::Problem &prb)
 
   prb.units() = newUnits;
 
-  std::cout << "--- FINE LEMMA 4 ---\n";
+  FO2Logger::logDebug("[Lemma 4] FINE LEMMA 4");
 }
 
 } // namespace Lemmata

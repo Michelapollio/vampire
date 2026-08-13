@@ -8,14 +8,16 @@
 #include "Lib/DHSet.hpp"
 #include "Kernel/TermIterators.hpp"
 #include "F02Fragment/RemoveEquality.hpp"
+#include "FO2Logger.hpp"
 
 namespace FO2Preprocessor {
 using namespace Kernel;
 using namespace Lib;
+using FO2Fragment::FO2Logger;
 
 bool Preprocessor::containsAllVariables(const DHSet<unsigned> &vars, const DHSet<unsigned> &required)
 {
-  std::cerr << "[FO2] checking variable coverage: " << vars.size() << " vs " << required.size() << std::endl;
+  FO2Logger::logDebug("checking variable coverage: " + std::to_string(vars.size()) + " vs " + std::to_string(required.size()));
   if (vars.size() < required.size()) {
     return false;
   }
@@ -103,6 +105,8 @@ bool Preprocessor::validateClause(Clause *cl, const char *&errorMessage)
 
 void Preprocessor::preprocess(Problem &prb)
 {
+  FO2Logger::logPhase("Inizio Preprocessing FO2");
+
   // ---- TRACING DIAGNOSTICO: stampa la struttura del problema in ingresso ----
   FO2Fragment::RemoveEquality::traceProblem(prb);
 
@@ -114,11 +118,11 @@ void Preprocessor::preprocess(Problem &prb)
   while (it.hasNext()) {
     Unit *u = it.next();
 
-    std::cerr << "[FO2] processing unit " << u->toString() << std::endl;
+    FO2Logger::logDebug("processing unit " + u->toString());
 
     if (!u->isClause()) {
       FormulaUnit *fu = static_cast<FormulaUnit *>(u);
-      std::cerr << "[FO2] applying NNF/flattening/skolemisation" << std::endl;
+      FO2Logger::logDebug("applying NNF/flattening/skolemisation");
       fu = Shell::NNF::nnf(fu);
       fu = Shell::Flattening::flatten(fu);
       fu = Shell::Skolem::skolemise(fu);
@@ -132,7 +136,7 @@ void Preprocessor::preprocess(Problem &prb)
      else {
       Clause *cl = static_cast<Clause *>(u);
       const char *errorMessage = nullptr;
-      std::cerr << "[FO2] entering clause validation" << std::endl;
+      FO2Logger::logDebug("entering clause validation");
       if (!validateClause(cl, errorMessage)) {
         std::cerr << errorMessage << std::endl;
         return;
@@ -140,12 +144,7 @@ void Preprocessor::preprocess(Problem &prb)
     }
   }
   
-  std::cout << "--- PROBLEMA DOPO IL PREPROCESSING ---" << std::endl;
-  UnitList::Iterator printIt(prb.units());
-  while (printIt.hasNext()) {
-    Unit *u = printIt.next();
-    std::cout << u->toString() << std::endl;
-  }
-  std::cout << "---------------------------------------" << std::endl;
+  FO2Logger::logLemma("PROBLEMA DOPO IL PREPROCESSING", prb);
+  FO2Logger::logPhase("Preprocessing FO2 completato");
 }
 } // namespace FO2Preprocessor

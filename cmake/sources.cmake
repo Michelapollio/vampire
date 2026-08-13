@@ -164,6 +164,7 @@ set(SOURCES
     FMB/Monotonicity.hpp
     FMB/SortInference.cpp
     FMB/SortInference.hpp
+    F02Fragment/FO2Logger.hpp
     F02Fragment/Classifier.cpp
     F02Fragment/FO2Preprocessor.cpp
     F02Fragment/RemoveEquality.cpp

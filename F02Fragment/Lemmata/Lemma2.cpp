@@ -11,6 +11,7 @@
 #include "Lib/DHMap.hpp"
 #include "Lib/Stack.hpp"
 #include "Lib/Environment.hpp"
+#include "F02Fragment/FO2Logger.hpp"
 
 #include <iostream>
 #include <string>
@@ -137,7 +138,7 @@ Formula *renameFormula(Formula *formula, Stack<Formula *> &newDefinitions)
       getFreeVars(processedSubf, hasX, hasY);
 
       if (formula->connective() == EXISTS && processedSubf->connective() != LITERAL) {
-        std::cout << "sottoformula complessa : " << processedSubf->toString() << "\n";
+        FO2Logger::logDebug("[Lemma 2] sottoformula complessa : " + processedSubf->toString());
 
         unsigned arity = 0;
         if (hasX) arity++;
@@ -192,7 +193,7 @@ Formula *renameFormula(Formula *formula, Stack<Formula *> &newDefinitions)
 void Lemma2::applyLemma2(Kernel::Problem &prb)
 {
 
-  std::cout << "\n--- APPLICAZIONE LEMMA 2  ---\n";
+  FO2Logger::logDebug("[Lemma 2] INIZIO APPLICAZIONE LEMMA 2");
 
   Stack<Formula *> newDefinitions;
 
@@ -224,7 +225,7 @@ void Lemma2::applyLemma2(Kernel::Problem &prb)
     prb.units() = UnitList::concat(newUnits, prb.units());
   }
 
-  std::cout << "--- FINE LEMMA 2 ---\n\n";
+  FO2Logger::logDebug("[Lemma 2] FINE LEMMA 2");
 }
 
 } // namespace FO2Fragment
