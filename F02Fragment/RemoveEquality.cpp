@@ -24,6 +24,7 @@
 #include "Lemmata/Lemma4.hpp"
 #include "Lemmata/Lemma5.hpp"
 #include "Lemmata/Lemma6.hpp"
+#include "FO2Classifier.hpp"
 #include "FO2Logger.hpp"
 
 #include <iostream>
@@ -66,7 +67,16 @@ void RemoveEquality::Lemma6Application(Kernel::Problem &prb)
 
 void RemoveEquality::removeEquality(Kernel::Problem &prb)
 {
-  if (!prb.hasEquality()) {
+  bool hasEq = false;
+  bool isFO2 = Classifier::isFO2(prb.units(), hasEq);
+
+  if (!isFO2) {
+    FO2Logger::logPhase("Il problema NON appartiene al frammento FO2 (più di 2 variabili libere o quantificate).");
+    return;
+  }
+
+  if (!hasEq && !prb.hasEquality()) {
+    FO2Logger::logPhase("Il problema appartiene al frammento FO2 e NON contiene uguaglianze. I lemmata vengono saltati.");
     return;
   }
 

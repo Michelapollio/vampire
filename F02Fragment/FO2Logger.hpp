@@ -72,6 +72,24 @@ class FO2Logger {
             }
         }
 
+        // stampa sempre lo stato delle unita' del problema a prescindere dal livello di verbosita'
+        static void logAlways(const std::string& title, Kernel::Problem &prb){
+            std::cout << "\n==================================================\n";
+            std::cout << "[FO2][OUTPUT FINALE] " << title << "\n";
+            std::cout << "==================================================\n";
+
+            Kernel::UnitList::Iterator it(prb.units());
+            size_t count = 0;
+            while (it.hasNext()) {
+                Kernel::Unit* u = it.next();
+                std::cout << "  [" << ++count << "] " << u->toString() << "\n";
+            }
+            if (count == 0) {
+                std::cout << "  (Nessuna unita' presente nel problema)\n";
+            }
+            std::cout << "--------------------------------------------------\n\n";
+        }
+
         //stampa completa -Debug 
         static void logDebug(const std::string& msg) {
             if (showsDebug()) {
