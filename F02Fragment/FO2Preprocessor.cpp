@@ -1,11 +1,17 @@
 #include "FO2Preprocessor.hpp"
 
 #include "Shell/Flattening.hpp"
+#include "Shell/NNF.hpp"
+#include "Shell/Skolem.hpp"
+#include "Shell/CNF.hpp"
+#include "Shell/NewCNF.hpp"
+#include "Shell/Rectify.hpp"
 #include "Kernel/SortHelper.hpp"
 #include "Kernel/Clause.hpp"
 #include "Kernel/Term.hpp"
 #include "FMB/ClauseFlattening.hpp"
 #include "Lib/DHSet.hpp"
+#include "Lib/Stack.hpp"
 #include "Kernel/TermIterators.hpp"
 #include "F02Fragment/RemoveEquality.hpp"
 #include "FO2Logger.hpp"
@@ -42,31 +48,12 @@ bool Preprocessor::coversAllVariables(const Term *t, const DHSet<unsigned> &clau
   return Preprocessor::containsAllVariables(termVars, clauseVars);
 }
 
-bool Preprocessor::hasMaximalLiteral(Clause *cl, const DHSet<unsigned> &clauseVars)
-{
-  for (int i = 0; i < (int)cl->length(); ++i) {
-    Literal *lit = (*cl)[i];
-    DHSet<unsigned> litVars;
-    VariableIterator vit(lit);
-    while (vit.hasNext()) {
-      TermList v = vit.next();
-      litVars.insert(v.var());
-    }
-
-    if (litVars.size() >= clauseVars.size() && Preprocessor::containsAllVariables(litVars, clauseVars)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 bool Preprocessor::validateClause(Clause *cl, const char *&errorMessage)
 {
   DHMap<unsigned, TermList, DefaultHash, DefaultHash2> varSorts;
   SortHelper::collectVariableSorts(cl, varSorts);
   if (varSorts.size() > 2) {
-    errorMessage = "FO2Preprocessor: clause violates S2 variable bound.";
+    errorMessage = "FO2Preprocessor: clause violates S2 variable bound (more than 2 variables).";
     return false;
   }
 
@@ -95,11 +82,6 @@ bool Preprocessor::validateClause(Clause *cl, const char *&errorMessage)
     }
   }
 
-  if (!Preprocessor::hasMaximalLiteral(cl, clauseVars)) {
-    errorMessage = "FO2Preprocessor: clause has no maximal literal covering all variables (violates S2).";
-    return false;
-  }
-
   return true;
 }
 
@@ -107,13 +89,10 @@ void Preprocessor::preprocess(Problem &prb)
 {
   FO2Logger::logPhase("Inizio Preprocessing FO2");
 
-  // ---- TRACING DIAGNOSTICO: stampa la struttura del problema in ingresso ----
-  FO2Fragment::RemoveEquality::traceProblem(prb);
-
-  FO2Fragment::RemoveEquality::removeEquality(prb);
-
-  UnitList *units = prb.units();
-  UnitList::DelIterator it(units);
+  // Fase 1 & 2: NNF, Flattening, Skolemizzazione e Clausificazione (CNF)
+  UnitList::DelIterator it(prb.units());
+  Stack<Clause*> clauses;
+  Shell::NewCNF newCnf(0);
 
   while (it.hasNext()) {
     Unit *u = it.next();
@@ -122,28 +101,44 @@ void Preprocessor::preprocess(Problem &prb)
 
     if (!u->isClause()) {
       FormulaUnit *fu = static_cast<FormulaUnit *>(u);
-      FO2Logger::logDebug("applying NNF/flattening/skolemisation");
+      FO2Logger::logDebug("applying Rectify/NNF/flattening/skolemisation/clausification");
+      fu = Shell::Rectify::rectify(fu);
       fu = Shell::NNF::nnf(fu);
       fu = Shell::Flattening::flatten(fu);
       fu = Shell::Skolem::skolemise(fu);
 
-      if (fu != u) {
-        it.replace(fu);
-        u = fu;
-      }
-    }
+      clauses.reset();
+      newCnf.clausify(fu, clauses);
 
-     else {
+      while (!clauses.isEmpty()) {
+        Clause *cl = clauses.pop();
+        it.insert(cl);
+      }
+      it.del();
+    }
+  }
+
+  // Fase 3: Validazione vincoli S2 su tutte le clausole risultanti
+  bool valid = true;
+  UnitList::Iterator uit(prb.units());
+  while (uit.hasNext()) {
+    Unit *u = uit.next();
+    if (u->isClause()) {
       Clause *cl = static_cast<Clause *>(u);
       const char *errorMessage = nullptr;
       FO2Logger::logDebug("entering clause validation");
       if (!validateClause(cl, errorMessage)) {
+        FO2Logger::logDebug("FO2Preprocessor Validation Warning: " + std::string(errorMessage));
         std::cerr << errorMessage << std::endl;
-        return;
+        valid = false;
       }
     }
   }
-  
+
+  if (!valid) {
+    FO2Logger::logPhase("ATTENZIONE: Alcune clausole violano i vincoli S2!");
+  }
+
   FO2Logger::logLemma("PROBLEMA DOPO IL PREPROCESSING", prb);
   FO2Logger::logPhase("Preprocessing FO2 completato");
 }

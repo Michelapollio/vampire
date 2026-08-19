@@ -6,6 +6,8 @@
 #include "Shell/NNF.hpp"
 #include "Shell/Flattening.hpp"
 #include "Shell/Skolem.hpp"
+#include "Shell/NewCNF.hpp"
+#include "Shell/CNF.hpp"
 
 namespace FO2Preprocessor {
 
@@ -19,7 +21,6 @@ namespace FO2Preprocessor {
   private:
     static bool containsAllVariables(const DHSet<unsigned> &vars, const DHSet<unsigned> &required);
     static bool coversAllVariables(const Term *t, const DHSet<unsigned> &clauseVars);
-    static bool hasMaximalLiteral(Clause *cl, const DHSet<unsigned> &clauseVars);
     static bool validateClause(Clause *cl, const char *&errorMessage);
   };
 } // namespace FO2Preprocessor

@@ -460,11 +460,27 @@ void fo2Mode(Problem* problem)
 {
   ScopedPtr<Problem> prb(problem);
 
-  // Esempio di impostazione verbosità: QUIET, PHASES, LEMMATA, DEBUG
-  FO2Fragment::FO2Logger::setVerbosity(FO2Fragment::VerbosityLevel::LEMMATA);
+  FO2Fragment::FO2Logger::setVerbosity(FO2Fragment::VerbosityLevel::PHASES);
 
-  FO2Fragment::FO2Logger::logPhase("start Remove Equality");
-  FO2Fragment::RemoveEquality::removeEquality(*prb);
+  bool hasEq = false;
+  bool isFO2 = FO2Fragment::Classifier::isFO2(prb->units(), hasEq);
+
+  if (!isFO2) {
+    std::cout << "[FO2] Errore: Il problema NON appartiene al frammento FO2 (più di 2 variabili libere o quantificate).\n";
+    vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
+    return;
+  }
+
+  if (!hasEq && !prb->hasEquality()) {
+    std::cout << "[FO2] Il problema appartiene al frammento FO2 e NON contiene uguaglianze. I lemmata vengono saltati.\n";
+  } else {
+    FO2Fragment::FO2Logger::logPhase("Inizio procedura di rimozione dell'uguaglianza per frammento FO2");
+    FO2Fragment::RemoveEquality::removeEquality(*prb);
+  }
+
+  FO2Preprocessor::Preprocessor::preprocess(*prb);
+
+  FO2Fragment::FO2Logger::logAlways("STATO FINALE DEL PROBLEMA", *prb);
 
   vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
 }
