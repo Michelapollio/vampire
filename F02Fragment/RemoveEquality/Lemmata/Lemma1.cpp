@@ -27,137 +27,186 @@ using namespace Shell;
 namespace FO2Fragment {
 namespace {
 
-Formula *replaceInEquality(Literal *lit, DHMap<unsigned, unsigned> &constants)
+unsigned getPredForConstant(unsigned constantFunctor, DHMap<unsigned, unsigned> &constants)
 {
-  FO2Logger::logDebug(" [1 trovata uguaglianza ]");
-  ASS(lit);
-  ASS(lit->isEquality());
-
-  TermList left = *lit->nthArgument(0);
-  TermList right = *lit->nthArgument(1);
-  bool changed = false;
-
-  FO2Logger::logDebug(" [2 inizio analisi termine sinistro ]");
-
-
-  if (!left.isVar() && env.signature->getFunction(left.term()->functor())->arity() == 0) {
-    FO2Logger::logDebug(" [TROVATA COSTANTE IN UGUAGLIANZA (SX)] ---");
-    unsigned constantFunctor = left.term()->functor();
-    unsigned predicateFunctor;
-
-    if (!constants.find(constantFunctor, predicateFunctor)) {
-      std::string constName = env.signature->getFunction(constantFunctor)->name();
-      std::string predName = "p_" + constName;
-      predicateFunctor = env.signature->addFreshPredicate(1, predName.c_str());
-      constants.insert(constantFunctor, predicateFunctor);
-    }
-
-    left = TermList::var(0);
-    changed = true;
+  unsigned predicateFunctor;
+  if (!constants.find(constantFunctor, predicateFunctor)) {
+    std::string constName = env.signature->getFunction(constantFunctor)->name();
+    std::string predName = "p_" + constName;
+    predicateFunctor = env.signature->addFreshPredicate(1, predName.c_str());
+    constants.insert(constantFunctor, predicateFunctor);
   }
-
-  FO2Logger::logDebug(" [3 inizio analisi termine destro ]");
-
-
-  if (!right.isVar() && env.signature->getFunction(right.term()->functor())->arity() == 0) {
-    FO2Logger::logDebug(" [TROVATA COSTANTE IN UGUAGLIANZA (DX)] ---");
-    unsigned constantFunctor = right.term()->functor();
-    unsigned predicateFunctor;
-
-    if (!constants.find(constantFunctor, predicateFunctor)) {
-      std::string constName = env.signature->getFunction(constantFunctor)->name();
-      std::string predName = "p_" + constName;
-      predicateFunctor = env.signature->addFreshPredicate(1, predName.c_str());
-      constants.insert(constantFunctor, predicateFunctor);
-    }
-
-    right = TermList::var(1);
-    changed = true;
-  }
-
-
-  if (changed) {
-    const TermList sort = AtomicSort::defaultSort();
-    Literal *modifiedEq = Literal::createEquality(lit->polarity(), left, right, sort);
-    return new AtomicFormula(modifiedEq);
-  }
-
-
-  return nullptr;
+  return predicateFunctor;
 }
 
+bool isConstantTerm(TermList tl)
+{
+  return !tl.isVar() && tl.term()->arity() == 0;
+}
+
+/**
+ * Implements Table 1 of Lemma 1 (de Nivelle & Pratt-Hartmann, Page 215)
+ */
 Formula *replaceinAtomicFormula(Formula *formula, DHMap<unsigned, unsigned> &constants)
 {
-
-  ASS(formula);
+  if (!formula) return nullptr;
   ASS_EQ(formula->connective(), LITERAL);
 
   Literal *lit = formula->literal();
+  if (!lit) return formula;
 
-  ASS(lit);
+  const TermList sort = AtomicSort::defaultSort();
 
-  if (!lit) {
-    return formula;
-  }
-
+  // Equality literal
   if (lit->isEquality()) {
-    Formula *eqResult = replaceInEquality(lit, constants);
-    if (eqResult) {
-      return eqResult;
+    TermList arg0 = *lit->nthArgument(0);
+    TermList arg1 = *lit->nthArgument(1);
+
+    bool isConst0 = isConstantTerm(arg0);
+    bool isConst1 = isConstantTerm(arg1);
+
+    if (!isConst0 && !isConst1) return formula;
+
+    if (isConst0 && !isConst1) {
+      unsigned pred0 = getPredForConstant(arg0.term()->functor(), constants);
+      unsigned otherVar = arg1.isVar() ? arg1.var() : 0;
+      unsigned freshVar = (otherVar == 0) ? 1 : 0;
+
+      Literal *eqLit = Literal::createEquality(lit->polarity(), TermList::var(freshVar), arg1, sort);
+      Literal *pLit = Literal::create1(pred0, true, TermList::var(freshVar));
+
+      FormulaList *andArgs = FormulaList::empty();
+      FormulaList::push(new AtomicFormula(pLit), andArgs);
+      FormulaList::push(new AtomicFormula(eqLit), andArgs);
+      Formula *conj = JunctionFormula::generalJunction(AND, andArgs);
+
+      return new QuantifiedFormula(EXISTS, VSList::singleton({freshVar, sort}), conj);
     }
-    return formula;
+    else if (!isConst0 && isConst1) {
+      unsigned pred1 = getPredForConstant(arg1.term()->functor(), constants);
+      unsigned otherVar = arg0.isVar() ? arg0.var() : 0;
+      unsigned freshVar = (otherVar == 0) ? 1 : 0;
+
+      Literal *eqLit = Literal::createEquality(lit->polarity(), arg0, TermList::var(freshVar), sort);
+      Literal *pLit = Literal::create1(pred1, true, TermList::var(freshVar));
+
+      FormulaList *andArgs = FormulaList::empty();
+      FormulaList::push(new AtomicFormula(pLit), andArgs);
+      FormulaList::push(new AtomicFormula(eqLit), andArgs);
+      Formula *conj = JunctionFormula::generalJunction(AND, andArgs);
+
+      return new QuantifiedFormula(EXISTS, VSList::singleton({freshVar, sort}), conj);
+    }
+    else { // Both are constants
+      unsigned pred0 = getPredForConstant(arg0.term()->functor(), constants);
+      unsigned pred1 = getPredForConstant(arg1.term()->functor(), constants);
+
+      Literal *eqLit = Literal::createEquality(lit->polarity(), TermList::var(0), TermList::var(1), sort);
+      Literal *pLit0 = Literal::create1(pred0, true, TermList::var(0));
+      Literal *pLit1 = Literal::create1(pred1, true, TermList::var(1));
+
+      FormulaList *andArgs = FormulaList::empty();
+      FormulaList::push(new AtomicFormula(pLit1), andArgs);
+      FormulaList::push(new AtomicFormula(pLit0), andArgs);
+      FormulaList::push(new AtomicFormula(eqLit), andArgs);
+      Formula *conj = JunctionFormula::generalJunction(AND, andArgs);
+
+      Formula *exists1 = new QuantifiedFormula(EXISTS, VSList::singleton({1u, sort}), conj);
+      return new QuantifiedFormula(EXISTS, VSList::singleton({0u, sort}), exists1);
+    }
   }
 
-  unsigned numArgs = lit->arity();
+  // Non-equality literal
+  unsigned arity = lit->arity();
+  if (arity == 0) return formula;
 
-
-  std::vector<TermList> newArgs;
-  newArgs.reserve(numArgs);
-
-  for (unsigned i = 0; i < numArgs; ++i) {
-    TermList arg = *lit->nthArgument(i);
-
-    if (arg.isVar()) {
-      newArgs.push_back(arg);
-    }
-    else {
-      Term *t = arg.term();
-      if (t->arity() == 0) {
-        unsigned constantFunctor = t->functor();
-        unsigned predicateFunctor;
-
-
-        if (!constants.find(constantFunctor, predicateFunctor)) {
-          FO2Logger::logDebug("[TROVATA COSTANTE ] ---");
-
-          std::string constName = env.signature->getFunction(constantFunctor)->name();
-          std::string predName = "p_" + constName;
-
-          predicateFunctor = env.signature->addFreshPredicate(1, predName.c_str());
-
-          constants.insert(constantFunctor, predicateFunctor);
-        }
-
-
-        unsigned freshVarIndex = i;
-        TermList freshVar = TermList(freshVarIndex, false);
-
-        newArgs.push_back(freshVar);
-      }
-      else {
-        newArgs.push_back(arg);
-      }
+  bool hasConstant = false;
+  for (unsigned i = 0; i < arity; ++i) {
+    if (isConstantTerm(*lit->nthArgument(i))) {
+      hasConstant = true;
+      break;
     }
   }
 
-  Literal *modifiedLit = Literal::create(
-      lit->functor(),
-      numArgs,
-      lit->polarity(),
-      newArgs.data());
+  if (!hasConstant) return formula;
 
-  AtomicFormula *nuova = new AtomicFormula(modifiedLit);
-  return nuova;
+  if (arity == 1) {
+    TermList arg0 = *lit->nthArgument(0);
+    if (isConstantTerm(arg0)) {
+      unsigned pred0 = getPredForConstant(arg0.term()->functor(), constants);
+      unsigned freshVar = 0;
+
+      Literal *modLit = Literal::create1(lit->functor(), lit->polarity(), TermList::var(freshVar));
+      Literal *pLit = Literal::create1(pred0, true, TermList::var(freshVar));
+
+      FormulaList *andArgs = FormulaList::empty();
+      FormulaList::push(new AtomicFormula(pLit), andArgs);
+      FormulaList::push(new AtomicFormula(modLit), andArgs);
+      Formula *conj = JunctionFormula::generalJunction(AND, andArgs);
+
+      return new QuantifiedFormula(EXISTS, VSList::singleton({freshVar, sort}), conj);
+    }
+  }
+  else if (arity == 2) {
+    TermList arg0 = *lit->nthArgument(0);
+    TermList arg1 = *lit->nthArgument(1);
+
+    bool isConst0 = isConstantTerm(arg0);
+    bool isConst1 = isConstantTerm(arg1);
+
+    if (isConst0 && !isConst1) {
+      unsigned pred0 = getPredForConstant(arg0.term()->functor(), constants);
+      unsigned otherVar = arg1.isVar() ? arg1.var() : 0;
+      unsigned freshVar = (otherVar == 0) ? 1 : 0;
+
+      TermList newArgs[2] = {TermList::var(freshVar), arg1};
+      Literal *modLit = Literal::create(lit->functor(), 2, lit->polarity(), newArgs);
+      Literal *pLit = Literal::create1(pred0, true, TermList::var(freshVar));
+
+      FormulaList *andArgs = FormulaList::empty();
+      FormulaList::push(new AtomicFormula(pLit), andArgs);
+      FormulaList::push(new AtomicFormula(modLit), andArgs);
+      Formula *conj = JunctionFormula::generalJunction(AND, andArgs);
+
+      return new QuantifiedFormula(EXISTS, VSList::singleton({freshVar, sort}), conj);
+    }
+    else if (!isConst0 && isConst1) {
+      unsigned pred1 = getPredForConstant(arg1.term()->functor(), constants);
+      unsigned otherVar = arg0.isVar() ? arg0.var() : 0;
+      unsigned freshVar = (otherVar == 0) ? 1 : 0;
+
+      TermList newArgs[2] = {arg0, TermList::var(freshVar)};
+      Literal *modLit = Literal::create(lit->functor(), 2, lit->polarity(), newArgs);
+      Literal *pLit = Literal::create1(pred1, true, TermList::var(freshVar));
+
+      FormulaList *andArgs = FormulaList::empty();
+      FormulaList::push(new AtomicFormula(pLit), andArgs);
+      FormulaList::push(new AtomicFormula(modLit), andArgs);
+      Formula *conj = JunctionFormula::generalJunction(AND, andArgs);
+
+      return new QuantifiedFormula(EXISTS, VSList::singleton({freshVar, sort}), conj);
+    }
+    else if (isConst0 && isConst1) {
+      unsigned pred0 = getPredForConstant(arg0.term()->functor(), constants);
+      unsigned pred1 = getPredForConstant(arg1.term()->functor(), constants);
+
+      TermList newArgs[2] = {TermList::var(0), TermList::var(1)};
+      Literal *modLit = Literal::create(lit->functor(), 2, lit->polarity(), newArgs);
+      Literal *pLit0 = Literal::create1(pred0, true, TermList::var(0));
+      Literal *pLit1 = Literal::create1(pred1, true, TermList::var(1));
+
+      FormulaList *andArgs = FormulaList::empty();
+      FormulaList::push(new AtomicFormula(pLit1), andArgs);
+      FormulaList::push(new AtomicFormula(pLit0), andArgs);
+      FormulaList::push(new AtomicFormula(modLit), andArgs);
+      Formula *conj = JunctionFormula::generalJunction(AND, andArgs);
+
+      Formula *exists1 = new QuantifiedFormula(EXISTS, VSList::singleton({1u, sort}), conj);
+      return new QuantifiedFormula(EXISTS, VSList::singleton({0u, sort}), exists1);
+    }
+  }
+
+  return formula;
 }
 
 Formula *makeUniquenessAxiom(unsigned predicateFunctor)
@@ -168,69 +217,48 @@ Formula *makeUniquenessAxiom(unsigned predicateFunctor)
   TermList x = TermList::var(0);
   TermList y = TermList::var(1);
 
-
   Formula *predY = new AtomicFormula(Literal::create1(predicateFunctor, true, y));
   Formula *eq = new AtomicFormula(Literal::createEquality(true, x, y, sort));
 
-
   Formula *implication = new BinaryFormula(Connective::IMP, predY, eq);
-  FO2Logger::logDebug("[Assioma Step 1] Implicazione (p(y) -> x=y): " + implication->toString());
-
-
   Formula *universalY = new QuantifiedFormula(Connective::FORALL,
                                               VSList::singleton({1u, sort}),
                                               implication);
-  FO2Logger::logDebug("[Assioma Step 2] universalY (∀y ...): " + universalY->toString());
-
 
   Formula *predX = new AtomicFormula(Literal::create1(predicateFunctor, true, x));
-
 
   FormulaList *andArgs = FormulaList::empty();
   FormulaList::push(universalY, andArgs);
   FormulaList::push(predX, andArgs);
   Formula *conjunction = JunctionFormula::generalJunction(Connective::AND, andArgs);
-  FO2Logger::logDebug("[Assioma Step 3] Congiunzione (p(x) & ∀y ...): " + conjunction->toString());
-
 
   Formula *finalAxiom = new QuantifiedFormula(Connective::EXISTS,
                                               VSList::singleton({0u, sort}),
                                               conjunction);
-
-  FO2Logger::logDebug("[Assioma FINALE]: " + finalAxiom->toString());
 
   return finalAxiom;
 }
 
 Formula *replaceInFormula(Formula *formula, DHMap<unsigned, unsigned> &constants)
 {
-  if (!formula)
-    return nullptr;
+  if (!formula) return nullptr;
 
   switch (formula->connective()) {
-    case LITERAL: {
-
+    case LITERAL:
       return replaceinAtomicFormula(formula, constants);
-    }
+
     case IMP:
     case IFF:
     case XOR: {
-      Formula *oldLeft = formula->left();
-      Formula *oldRight = formula->right();
-
-      Formula *newLeft = replaceInFormula(oldLeft, constants);
-      Formula *newRight = replaceInFormula(oldRight, constants);
-
-      if (newLeft != oldLeft || newRight != oldRight) {
+      Formula *newLeft = replaceInFormula(formula->left(), constants);
+      Formula *newRight = replaceInFormula(formula->right(), constants);
+      if (newLeft != formula->left() || newRight != formula->right()) {
         return new BinaryFormula(formula->connective(), newLeft, newRight);
       }
-      else {
-        return formula;
-      }
+      return formula;
     }
     case AND:
     case OR: {
-
       FormulaList *args = formula->args();
       FormulaList *newArgs = FormulaList::empty();
       bool changed = false;
@@ -239,8 +267,7 @@ Formula *replaceInFormula(Formula *formula, DHMap<unsigned, unsigned> &constants
       while (it.hasNext()) {
         Formula *arg = it.next();
         Formula *newArg = replaceInFormula(arg, constants);
-        if (newArg != arg)
-          changed = true;
+        if (newArg != arg) changed = true;
         FormulaList::push(newArg, newArgs);
       }
       newArgs = FormulaList::reverse(newArgs);
@@ -248,40 +275,23 @@ Formula *replaceInFormula(Formula *formula, DHMap<unsigned, unsigned> &constants
       if (changed) {
         return new JunctionFormula(formula->connective(), newArgs);
       }
-      else {
-
-        FormulaList::destroy(newArgs);
-        return formula;
-      }
+      FormulaList::destroy(newArgs);
+      return formula;
     }
     case NOT: {
-      Formula *oldArg = formula->uarg();
-      Formula *newArg = replaceInFormula(oldArg, constants);
-
-      if (newArg != oldArg) {
+      Formula *newArg = replaceInFormula(formula->uarg(), constants);
+      if (newArg != formula->uarg()) {
         return new NegatedFormula(newArg);
       }
       return formula;
     }
-
     case FORALL:
     case EXISTS: {
-      FO2Logger::logDebug("[RICORSIONE] Entrato in FORALL/EXISTS");
-      Formula *oldSub = formula->qarg();
-      FO2Logger::logDebug("[RICORSIONE] Sto per chiamare replaceInFormula sulla sottoformula...");
-      Formula *newSub = replaceInFormula(oldSub, constants);
-
-      FO2Logger::logDebug("[RICORSIONE] Ritornato dalla sottoformula! Confronto i puntatori...");
-      if (newSub != oldSub) {
-        FO2Logger::logDebug("[RICORSIONE] La formula è cambiata, provo a creare QuantifiedFormula...");
-        Formula *ris = new QuantifiedFormula(formula->connective(), formula->vars(), newSub);
-        FO2Logger::logDebug("[RICORSIONE] QuantifiedFormula creata con successo!");
-        return ris;
+      Formula *newSub = replaceInFormula(formula->qarg(), constants);
+      if (newSub != formula->qarg()) {
+        return new QuantifiedFormula(formula->connective(), formula->vars(), newSub);
       }
-      else {
-        FO2Logger::logDebug("[RICORSIONE] La formula NON è cambiata, restituisco l'originale");
-        return formula;
-      }
+      return formula;
     }
     default:
       return formula;
@@ -291,31 +301,23 @@ Formula *replaceInFormula(Formula *formula, DHMap<unsigned, unsigned> &constants
 Unit *replaceInClause(Clause *cl, DHMap<unsigned, unsigned> &constants)
 {
   bool modified = false;
-
   Stack<Formula *> processedLiterals;
 
   const unsigned len = cl->length();
   for (unsigned i = 0; i < len; ++i) {
     Literal *lit = (*cl)[i];
-
     Formula *litFormula = new AtomicFormula(lit);
-
     Formula *processedFormula = replaceInFormula(litFormula, constants);
 
     if (processedFormula != litFormula) {
-      delete litFormula;
       modified = true;
     }
     processedLiterals.push(processedFormula);
   }
 
   if (!modified) {
-    while (!processedLiterals.isEmpty()) {
-      delete processedLiterals.pop();
-    }
     return cl;
   }
-
 
   FormulaList *disjuncts = FormulaList::empty();
   while (!processedLiterals.isEmpty()) {
@@ -332,9 +334,7 @@ Unit *replaceInClause(Clause *cl, DHMap<unsigned, unsigned> &constants)
 
 void Lemma1::applyLemma1(Kernel::Problem &prb)
 {
-
   DHMap<unsigned, unsigned> constants;
-
 
   UnitList::DelIterator it(prb.units());
   while (it.hasNext()) {

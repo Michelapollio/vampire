@@ -177,6 +177,7 @@ set(SOURCES
     F02Fragment/RemoveEquality/Lemmata/Lemma6.cpp
     F02Fragment/Resolution/FO2Resolution.cpp
     F02Fragment/Resolution/FO2Inferences.cpp
+    F02Fragment/Resolution/FO2Solver.cpp
     Indexing/AcyclicityIndex.cpp
     Indexing/AcyclicityIndex.hpp
     Indexing/ClauseCodeTree.cpp

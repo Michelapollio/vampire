@@ -45,7 +45,7 @@ bool Lemma5::isUnaryOnVar(Kernel::Literal* lit, unsigned targetVar)
     }
   }
 
-  return !hasOther;
+  return hasTarget && !hasOther;
 }
 
 /**
@@ -261,11 +261,7 @@ void Lemma5::applyLemma5(Kernel::Problem &prb)
       Kernel::FormulaList::push(ramo3, branches);
       Kernel::FormulaList::push(ramo2, branches);
       Kernel::FormulaList::push(ramo1, branches);
-      Kernel::Formula* equivFormula = Kernel::JunctionFormula::generalJunction(Kernel::OR, branches);
-
-      FO2Logger::logDebug("[Lemma 5] Formula generata senza uguaglianza diretta: " + equivFormula->toString().substr(0, 80) + "...");
-
-      Kernel::Unit* newUnit = new Kernel::FormulaUnit(equivFormula, Kernel::Inference(Kernel::FromInput(Kernel::UnitInputType::AXIOM)));
+      Kernel::Unit* newUnit = new Kernel::FormulaUnit(ramo1, Kernel::Inference(Kernel::FromInput(Kernel::UnitInputType::AXIOM)));
       Kernel::UnitList::push(newUnit, newUnits);
       continue;
     }

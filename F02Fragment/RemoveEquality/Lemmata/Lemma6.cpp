@@ -1,5 +1,6 @@
 #include "Lemma6.hpp"
 #include "Lemma1.hpp"
+#include "Lemma2.hpp"
 #include "F02Fragment/FO2Logger.hpp"
 
 #include "Kernel/Clause.hpp"
@@ -122,12 +123,19 @@ Formula* Lemma6::extractZetaFromUniqueness(Formula* formula)
   if (formula->connective() == EXISTS) {
     Formula* body = formula->qarg();
     if (body && body->connective() == AND) {
+      bool hasForall = false;
+      Formula* candidateZeta = nullptr;
       FormulaList::Iterator it(body->args());
       while (it.hasNext()) {
         Formula* child = it.next();
-        if (child->connective() != FORALL && child->connective() != EXISTS) {
-          return child;
+        if (child->connective() == FORALL) {
+          hasForall = true;
+        } else {
+          candidateZeta = child;
         }
+      }
+      if (hasForall && candidateZeta) {
+        return candidateZeta;
       }
     }
   }
@@ -146,11 +154,8 @@ Formula* Lemma6::extractZetaFromUniqueness(Formula* formula)
     }
     case IMP:
     case IFF:
-    case XOR: {
-      Formula* res = extractZetaFromUniqueness(formula->left());
-      if (res) return res;
-      return extractZetaFromUniqueness(formula->right());
-    }
+    case XOR:
+      break;
     case FORALL:
       return extractZetaFromUniqueness(formula->qarg());
     default:
@@ -163,7 +168,7 @@ Formula* Lemma6::extractZetaFromUniqueness(Formula* formula)
 /**
  * @brief Sostituisce la sottoformula di quantificazione d'unicita' con la costante vera (TRUE) all'interno di una formula.
  */
-Formula* Lemma6::replaceUniquenessWithTrue(Formula* formula)
+Formula* Lemma6::replaceUniquenessWithFormula(Formula* formula, Formula* replacement)
 {
   if (!formula) return nullptr;
 
@@ -179,14 +184,14 @@ Formula* Lemma6::replaceUniquenessWithTrue(Formula* formula)
         }
       }
       if (hasForall) {
-        return new Formula(true);
+        return replacement;
       }
     }
   }
 
   switch (formula->connective()) {
     case NOT: {
-      Formula* newArg = replaceUniquenessWithTrue(formula->uarg());
+      Formula* newArg = replaceUniquenessWithFormula(formula->uarg(), replacement);
       if (newArg != formula->uarg()) return new NegatedFormula(newArg);
       return formula;
     }
@@ -199,7 +204,7 @@ Formula* Lemma6::replaceUniquenessWithTrue(Formula* formula)
       FormulaList::Iterator it(args);
       while (it.hasNext()) {
         Formula* arg = it.next();
-        Formula* newArg = replaceUniquenessWithTrue(arg);
+        Formula* newArg = replaceUniquenessWithFormula(arg, replacement);
         if (newArg != arg) changed = true;
         FormulaList::push(newArg, newArgs);
       }
@@ -214,15 +219,15 @@ Formula* Lemma6::replaceUniquenessWithTrue(Formula* formula)
     case IMP:
     case IFF:
     case XOR: {
-      Formula* newLeft = replaceUniquenessWithTrue(formula->left());
-      Formula* newRight = replaceUniquenessWithTrue(formula->right());
+      Formula* newLeft = replaceUniquenessWithFormula(formula->left(), replacement);
+      Formula* newRight = replaceUniquenessWithFormula(formula->right(), replacement);
       if (newLeft != formula->left() || newRight != formula->right()) {
         return new BinaryFormula(formula->connective(), newLeft, newRight);
       }
       return formula;
     }
     case FORALL: {
-      Formula* newQarg = replaceUniquenessWithTrue(formula->qarg());
+      Formula* newQarg = replaceUniquenessWithFormula(formula->qarg(), replacement);
       if (newQarg != formula->qarg()) {
         return new QuantifiedFormula(formula->connective(), formula->vars(), newQarg);
       }
@@ -320,22 +325,22 @@ void Lemma6::applyLemma6(Problem &prb)
         env.signature->getFunction(freshConstFunctor)->setType(OperatorType::getConstantsType(AtomicSort::defaultSort()));
         TermList constTerm = TermList(Term::createConstant(freshConstFunctor));
 
-        std::cout << "[Lemma 6] Trovata asserzione d'unicita' per zeta(x): " << zetaI->toString() << "\n";
-        std::cout << "[Lemma 6] Generata costante fresca: " << env.signature->getFunction(freshConstFunctor)->name() << "\n";
+        // Normalize all variables in zetaI to variable 0 (X0) to maintain 2-variable bound
+        Formula* normalizedZeta = zetaI;
+        for (unsigned v = 1; v < 16; ++v) {
+          normalizedZeta = replaceVarWithTerm(normalizedZeta, v, TermList::var(0));
+        }
+
+        FO2Logger::logDebug("[Lemma 6] Trovata asserzione d'unicita' per zeta(x): " + normalizedZeta->toString());
+        FO2Logger::logDebug("[Lemma 6] Generata costante fresca: " + env.signature->getFunction(freshConstFunctor)->name());
 
         FormulaList* axioms = FormulaList::empty();
-        generateCongruenceAxioms(zetaI, constTerm, axioms);
+        generateCongruenceAxioms(normalizedZeta, constTerm, axioms);
 
-        Formula* cleanFormula = replaceUniquenessWithTrue(fu->formula());
+        Formula* axiomsConj = JunctionFormula::generalJunction(AND, axioms);
+        Formula* cleanFormula = replaceUniquenessWithFormula(fu->formula(), axiomsConj);
         FormulaUnit* cleanUnit = new FormulaUnit(cleanFormula, Inference(FromInput(UnitInputType::AXIOM)));
         UnitList::push(cleanUnit, newUnits);
-
-        FormulaList::Iterator axIt(axioms);
-        while (axIt.hasNext()) {
-          Formula* ax = axIt.next();
-          FormulaUnit* axUnit = new FormulaUnit(ax, Inference(FromInput(UnitInputType::AXIOM)));
-          UnitList::push(axUnit, newUnits);
-        }
 
         continue;
       }
@@ -347,8 +352,10 @@ void Lemma6::applyLemma6(Problem &prb)
   prb.units() = UnitList::reverse(newUnits);
 
   if (createdConstants) {
-    std::cout << "[Lemma 6] Riapplicazione Lemma 1 per eliminare le costanti fresche e tornare a L2 puro...\n";
+    FO2Logger::logDebug("[Lemma 6] Riapplicazione Lemma 1 per eliminare le costanti fresche e tornare a L2 puro...");
     Lemma1::applyLemma1(prb);
+    FO2Logger::logDebug("[Lemma 6] Riapplicazione Lemma 2 per garantire la forma normale di Scott a 2 variabili...");
+    Lemma2::applyLemma2(prb);
   }
 
   FO2Logger::logPhase("Lemma 6 Completato: Formula ridotta a L2 puro (senza uguaglianza)");

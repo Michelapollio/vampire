@@ -64,6 +64,7 @@
 #include "F02Fragment/RemoveEquality/RemoveEquality.hpp"
 #include "F02Fragment/FO2Logger.hpp"
 #include "F02Fragment/Resolution/FO2Resolution.hpp"
+#include "F02Fragment/Resolution/FO2Solver.hpp"
 
 using namespace std;
 
@@ -461,7 +462,7 @@ void fo2Mode(Problem* problem)
 {
   ScopedPtr<Problem> prb(problem);
 
-  FO2Fragment::FO2Logger::setVerbosity(FO2Fragment::VerbosityLevel::PHASES);
+  FO2Fragment::FO2Logger::setVerbosity(FO2Fragment::VerbosityLevel::QUIET);
 
   bool hasEq = false;
   bool isFO2 = FO2Fragment::Classifier::isFO2(prb->units(), hasEq);
@@ -483,16 +484,14 @@ void fo2Mode(Problem* problem)
 
   FO2Fragment::FO2Logger::logAlways("STATO FINALE DEL PROBLEMA", *prb);
 
-  FO2Fragment::FO2Logger::logPhase("Indicizzazione S2+i Clausole (FO2Kernel)");
-  UnitList::Iterator uit(prb->units());
-  while (uit.hasNext()) {
-    Unit* u = uit.next();
-    if (u->isClause()) {
-      Clause* cl = static_cast<Clause*>(u);
-      FO2Fragment::IndexedClause icl = FO2Fragment::IndexedClause::fromClause(cl);
-      FO2Fragment::FO2Logger::logAlways("[S2+i Selection Σ2] " + icl.toStringWithSelection(), *prb);
-    }
+  FO2Fragment::FO2Result res = FO2Fragment::FO2Solver::solve(*prb);
+  if (res == FO2Fragment::FO2Result::SATISFIABLE) {
+    env.statistics->terminationReason = TerminationReason::SATISFIABLE;
+  } else if (res == FO2Fragment::FO2Result::UNSATISFIABLE) {
+    env.statistics->terminationReason = TerminationReason::REFUTATION;
   }
+
+  UIHelper::outputResult(std::cout);
 
   vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
 }

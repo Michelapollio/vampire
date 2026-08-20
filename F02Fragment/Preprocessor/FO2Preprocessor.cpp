@@ -129,14 +129,13 @@ void Preprocessor::preprocess(Problem &prb)
       FO2Logger::logDebug("entering clause validation");
       if (!validateClause(cl, errorMessage)) {
         FO2Logger::logDebug("FO2Preprocessor Validation Warning: " + std::string(errorMessage));
-        std::cerr << errorMessage << std::endl;
         valid = false;
       }
     }
   }
 
   if (!valid) {
-    FO2Logger::logPhase("ATTENZIONE: Alcune clausole violano i vincoli S2!");
+    FO2Logger::logDebug("FO2Preprocessor: Alcune clausole pre-saturazione contengono componenti da dividere tramite Splitting.");
   }
 
   FO2Logger::logLemma("PROBLEMA DOPO IL PREPROCESSING", prb);
