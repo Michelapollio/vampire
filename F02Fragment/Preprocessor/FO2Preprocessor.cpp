@@ -13,8 +13,8 @@
 #include "Lib/DHSet.hpp"
 #include "Lib/Stack.hpp"
 #include "Kernel/TermIterators.hpp"
-#include "F02Fragment/RemoveEquality.hpp"
-#include "FO2Logger.hpp"
+#include "F02Fragment/RemoveEquality/RemoveEquality.hpp"
+#include "F02Fragment/FO2Logger.hpp"
 
 namespace FO2Preprocessor {
 using namespace Kernel;

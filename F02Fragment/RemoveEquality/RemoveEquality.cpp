@@ -24,8 +24,8 @@
 #include "Lemmata/Lemma4.hpp"
 #include "Lemmata/Lemma5.hpp"
 #include "Lemmata/Lemma6.hpp"
-#include "FO2Classifier.hpp"
-#include "FO2Logger.hpp"
+#include "F02Fragment/Classifier/Classifier.hpp"
+#include "F02Fragment/FO2Logger.hpp"
 
 #include <iostream>
 #include <string>

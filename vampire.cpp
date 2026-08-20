@@ -59,10 +59,11 @@
 
 #include "FMB/ModelCheck.hpp"
 
-#include "F02Fragment/FO2Classifier.hpp"
-#include "F02Fragment/FO2Preprocessor.hpp"
-#include "F02Fragment/RemoveEquality.hpp"
+#include "F02Fragment/Classifier/Classifier.hpp"
+#include "F02Fragment/Preprocessor/FO2Preprocessor.hpp"
+#include "F02Fragment/RemoveEquality/RemoveEquality.hpp"
 #include "F02Fragment/FO2Logger.hpp"
+#include "F02Fragment/Resolution/FO2Resolution.hpp"
 
 using namespace std;
 
@@ -481,6 +482,17 @@ void fo2Mode(Problem* problem)
   FO2Preprocessor::Preprocessor::preprocess(*prb);
 
   FO2Fragment::FO2Logger::logAlways("STATO FINALE DEL PROBLEMA", *prb);
+
+  FO2Fragment::FO2Logger::logPhase("Indicizzazione S2+i Clausole (FO2Kernel)");
+  UnitList::Iterator uit(prb->units());
+  while (uit.hasNext()) {
+    Unit* u = uit.next();
+    if (u->isClause()) {
+      Clause* cl = static_cast<Clause*>(u);
+      FO2Fragment::IndexedClause icl = FO2Fragment::IndexedClause::fromClause(cl);
+      FO2Fragment::FO2Logger::logAlways("[S2+i Selection Σ2] " + icl.toStringWithSelection(), *prb);
+    }
+  }
 
   vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
 }

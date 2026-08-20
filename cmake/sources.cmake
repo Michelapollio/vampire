@@ -165,16 +165,18 @@ set(SOURCES
     FMB/SortInference.cpp
     FMB/SortInference.hpp
     F02Fragment/FO2Logger.hpp
-    F02Fragment/Classifier.cpp
-    F02Fragment/FO2Preprocessor.cpp
-    F02Fragment/RemoveEquality.cpp
     F02Fragment/ScottTypes.cpp
-    F02Fragment/Lemmata/Lemma1.cpp
-    F02Fragment/Lemmata/Lemma2.cpp
-    F02Fragment/Lemmata/Lemma3.cpp
-    F02Fragment/Lemmata/Lemma4.cpp
-    F02Fragment/Lemmata/Lemma5.cpp
-    F02Fragment/Lemmata/Lemma6.cpp
+    F02Fragment/Classifier/Classifier.cpp
+    F02Fragment/Preprocessor/FO2Preprocessor.cpp
+    F02Fragment/RemoveEquality/RemoveEquality.cpp
+    F02Fragment/RemoveEquality/Lemmata/Lemma1.cpp
+    F02Fragment/RemoveEquality/Lemmata/Lemma2.cpp
+    F02Fragment/RemoveEquality/Lemmata/Lemma3.cpp
+    F02Fragment/RemoveEquality/Lemmata/Lemma4.cpp
+    F02Fragment/RemoveEquality/Lemmata/Lemma5.cpp
+    F02Fragment/RemoveEquality/Lemmata/Lemma6.cpp
+    F02Fragment/Resolution/FO2Resolution.cpp
+    F02Fragment/Resolution/FO2Inferences.cpp
     Indexing/AcyclicityIndex.cpp
     Indexing/AcyclicityIndex.hpp
     Indexing/ClauseCodeTree.cpp
