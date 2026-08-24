@@ -10,12 +10,21 @@ namespace Kernel {
 
 namespace FO2Fragment {
 
+/**
+ * @brief Handles elimination of equality literals in FO2 problems.
+ * Applies Lemmata 1 through 6 sequentially to eliminate equality from FO2 formulas
+ * while preserving satisfiability.
+ */
 class RemoveEquality {
 public:
+  /**
+   * @brief Removes equality from an FO2 problem by applying Lemmata 1 to 6.
+   * @param prb Problem instance from which equality will be eliminated.
+   */
   static void removeEquality(Kernel::Problem& prb);
   
 
-  // Funzioni diagnostiche di tracing (sola lettura, non modificano il problema)
+  // Tracing diagnostic functions (read-only, do not modify the problem)
   static void traceProblem(Kernel::Problem& prb);
   static void traceFormula(Kernel::Formula* formula, int depth);
   static void traceClause(Kernel::Clause* cl);

@@ -158,7 +158,7 @@ Formula *renameFormula(Formula *formula, Stack<Formula *> &newDefinitions)
           newLit = Literal::create(newPred, true, {});
         }
 
-        // Costruiamo la formula di definizione: ∀[vars]. (p_def(vars) <=> sottoformula)
+        // Construct definition formula: \forall [vars]. (p_def(vars) <=> subformula)
         Formula* defAtom = new AtomicFormula(newLit);
         Formula* biconditional = new BinaryFormula(IFF, defAtom, processedSubf);
 
@@ -172,7 +172,7 @@ Formula *renameFormula(Formula *formula, Stack<Formula *> &newDefinitions)
 
         newDefinitions.push(defFormula);
 
-        // Sostituiamo la sottoformula complessa con il nuovo atomo
+        // Replace complex subformula with the new predicate atom
         Formula *replacementAtom = new AtomicFormula(newLit);
         return new QuantifiedFormula(formula->connective(), formula->vars(), replacementAtom);
       }

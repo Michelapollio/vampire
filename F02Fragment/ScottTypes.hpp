@@ -18,7 +18,9 @@ enum class ScottType {
 };
 
 /**
- * Determina il tipo di Scott (Tipo 1, Tipo 2, Tipo 3) di una formula.
+ * @brief Determines the Scott Normal Form type (Type 1, Type 2, or Type 3) of a given formula.
+ * @param formula Pointer to the formula to inspect.
+ * @return ScottType classification (TYPE_1, TYPE_2, or TYPE_3).
  */
 ScottType determineScottType(Kernel::Formula *formula);
 

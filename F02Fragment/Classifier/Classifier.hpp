@@ -5,24 +5,38 @@
 namespace FO2Fragment {
 using namespace Kernel;
 
+/**
+ * @brief Classifier for the FO2 (Two-Variable Fragment) logic.
+ * Inspects parsed formulas/clauses to determine if the problem stays within the two-variable bound
+ * and detects the presence of equality literals.
+ */
 class Classifier {
 
 public:
   /**
-   * Analizza l'intera UnitList restituita dal parser
-   * Ritorna true se il problema appartiene al frammento a due variabili
-   * e imposta `hasEq` se sono presenti letterali di uguaglianza
+   * @brief Analyzes the UnitList returned by the parser.
+   * @param ul Pointer to the list of units (formulas or clauses).
+   * @param hasEq Set to true if equality literals are found in the problem.
+   * @return true if the problem belongs to the FO2 fragment, false otherwise.
    */
     static bool isFO2(UnitList *ul, bool &hasEq);
 
 private:
   /**
-   * Analisi ricorsiva per formula (FOF)
+   * @brief Recursive analysis of First-Order Formulas (FOF).
+   * @param f Formula to analyze.
+   * @param varSet Set of quantified variables collected so far.
+   * @param hasEq Flag set to true if an equality literal is encountered.
+   * @return true if the formula belongs to the FO2 fragment, false otherwise.
    */
-  static bool isFO2Formula(Formula *f, DHSet<unsigned> &vars, bool &hasEq);
+  static bool isFO2Formula(Formula *f, DHSet<unsigned> &varSet, bool &hasEq);
 
   /**
-   * Analisi per le clausole (CNF)
+   * @brief Analysis of CNF clauses.
+   * @param clause Clause to analyze.
+   * @param vars Set of variables in the clause.
+   * @param hasEq Flag set to true if an equality literal is encountered.
+   * @return true if the clause belongs to the FO2 fragment, false otherwise.
    */
   static bool isFO2Clause(Clause *clause, DHSet<unsigned> &vars, bool &hasEq);
 };

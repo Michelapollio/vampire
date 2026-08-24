@@ -9,8 +9,15 @@
 namespace FO2Fragment {
 namespace Lemmata {
 
+/**
+ * @brief Implementation of Lemma 5 (Decomposition of Type 3 formulas into unary components).
+ */
 class Lemma5 {
 public:
+  /**
+   * @brief Applies Lemma 5 to the given problem.
+   * @param prb Problem instance to transform.
+   */
   static void applyLemma5(Kernel::Problem &prb);
 
 private:

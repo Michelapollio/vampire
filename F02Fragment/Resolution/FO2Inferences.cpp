@@ -2,7 +2,6 @@
 #include "Kernel/RobSubstitution.hpp"
 #include "Kernel/TermIterators.hpp"
 #include "Lib/DHSet.hpp"
-#include "Lib/DHMap.hpp"
 
 using namespace Kernel;
 using namespace Lib;

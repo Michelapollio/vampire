@@ -27,13 +27,13 @@ public:
                      IndexedClause& outFactor);
 
   /**
-   * @brief Checks indexed subsumption (Definition 4.1).
+   * @brief Checks indexed subsumption.
    * Returns true if icl1 subsumes icl2 (matching literals AND indices).
    */
   static bool subsumes(const IndexedClause& icl1, const IndexedClause& icl2);
 
   /**
-   * @brief Checks if an indexed clause can be split into variable-disjoint subclauses (Definition 4.1 Splitting).
+   * @brief Checks if an indexed clause can be split into variable-disjoint subclauses.
    * Returns true if split succeeded, populating outR1 and outR2.
    */
   static bool split(const IndexedClause& icl, IndexedClause& outR1, IndexedClause& outR2);

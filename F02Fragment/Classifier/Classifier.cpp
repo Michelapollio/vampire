@@ -9,9 +9,9 @@
 using namespace Kernel;
 
 /**
- * Funzione principale che analizza la UnitList
- * restituita dal parser e verifica se l'intero problema 
- * è nel frammento F02. Efettua controllo su tutte le unità (formule o clausole)
+ * Main function that analyzes the UnitList returned by the parser
+ * and checks whether the entire problem belongs to the FO2 fragment.
+ * Checks all units (formulas or clauses).
  */
 bool FO2Fragment::Classifier::isFO2(UnitList *ul, bool &hasEq) {
     UnitList::Iterator it(ul);
@@ -37,13 +37,12 @@ bool FO2Fragment::Classifier::isFO2(UnitList *ul, bool &hasEq) {
 }
 
 /**
- * Analisi ricorsiva delle formule FOF
- * @param f: formula da analizzare
- * @param vars: insieme delle variabili quantificate finora
- * @param hasEq: flag che indica se è stata incontrata un'uguaglianza
- * @return true se la formula è nel frammento F02, false altrimenti
+ * Recursive analysis of FOF formulas
+ * @param f Formula to analyze
+ * @param varSet Set of quantified variables collected so far
+ * @param hasEq Flag indicating if an equality literal was encountered
+ * @return true if the formula is in the FO2 fragment, false otherwise
  */
-
  bool FO2Fragment::Classifier::isFO2Formula(Formula *f, DHSet<unsigned> &varSet, bool &hasEq) {
     switch (f->connective()){
         case AND:
@@ -109,15 +108,13 @@ bool FO2Fragment::Classifier::isFO2(UnitList *ul, bool &hasEq) {
     }
  }
 
-
-
-  /**
-   * Analisi delle clausole CNF
-   * @param clause: clausola da analizzare
-  * @param isEq: flag che indica se la clausola contiene un'uguaglianza
-  * @return true se la clausola è nel frammento F02, false al
-  */
-
+/**
+ * Analysis of CNF clauses
+ * @param clause Clause to analyze
+ * @param vars Set of variables in the clause
+ * @param hasEq Flag indicating if the clause contains an equality literal
+ * @return true if the clause is in the FO2 fragment, false otherwise
+ */
     bool FO2Fragment::Classifier::isFO2Clause(Clause* clause, DHSet<unsigned> &vars, bool &hasEq) {
 
      for (unsigned i = 0; i < clause->length(); ++i) {

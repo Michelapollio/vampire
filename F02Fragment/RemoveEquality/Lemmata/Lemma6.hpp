@@ -9,8 +9,15 @@
 namespace FO2Fragment {
 namespace Lemmata {
 
+/**
+ * @brief Implementation of Lemma 6 (Elimination of equality with uniqueness axioms via congruence).
+ */
 class Lemma6 {
 public:
+  /**
+   * @brief Applies Lemma 6 to the given problem.
+   * @param prb Problem instance to transform.
+   */
   static void applyLemma6(Kernel::Problem &prb);
 
 private:

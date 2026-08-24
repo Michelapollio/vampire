@@ -71,38 +71,38 @@ void RemoveEquality::removeEquality(Kernel::Problem &prb)
   bool isFO2 = Classifier::isFO2(prb.units(), hasEq);
 
   if (!isFO2) {
-    FO2Logger::logPhase("Il problema NON appartiene al frammento FO2 (più di 2 variabili libere o quantificate).");
+    FO2Logger::logPhase("Problem does NOT belong to the FO2 fragment (more than 2 free or quantified variables).");
     return;
   }
 
   if (!hasEq && !prb.hasEquality()) {
-    FO2Logger::logPhase("Il problema appartiene al frammento FO2 e NON contiene uguaglianze. I lemmata vengono saltati.");
+    FO2Logger::logPhase("Problem belongs to the FO2 fragment and does NOT contain equality. Skipping lemmata.");
     return;
   }
 
-  FO2Logger::logPhase("Inizio procedura di rimozione dell'uguaglianza (RemoveEquality)");
+  FO2Logger::logPhase("Starting equality removal procedure (RemoveEquality)");
 
-  FO2Logger::logLemma("PRIMA DEL LEMMA 1", prb);
+  FO2Logger::logLemma("BEFORE LEMMA 1", prb);
   Lemma1Application(prb);
 
-  FO2Logger::logLemma("DOPO IL LEMMA 1", prb);
+  FO2Logger::logLemma("AFTER LEMMA 1", prb);
   Lemma2Application(prb);
 
-  FO2Logger::logLemma("DOPO IL LEMMA 2", prb);
+  FO2Logger::logLemma("AFTER LEMMA 2", prb);
   Lemma3Application(prb);
 
-  FO2Logger::logLemma("DOPO IL LEMMA 3", prb);
+  FO2Logger::logLemma("AFTER LEMMA 3", prb);
   Lemma4Application(prb);
 
-  FO2Logger::logLemma("DOPO IL LEMMA 4", prb);
+  FO2Logger::logLemma("AFTER LEMMA 4", prb);
   Lemma5Application(prb);
 
-  FO2Logger::logLemma("DOPO IL LEMMA 5", prb);
+  FO2Logger::logLemma("AFTER LEMMA 5", prb);
   Lemma6Application(prb);
 
-  FO2Logger::logLemma("DOPO IL LEMMA 6", prb);
+  FO2Logger::logLemma("AFTER LEMMA 6", prb);
 
-  FO2Logger::logPhase("Rimozione dell'uguaglianza completata");
+  FO2Logger::logPhase("Equality removal completed");
 }
 
 void RemoveEquality::traceProblem(Kernel::Problem &prb)

@@ -45,14 +45,14 @@ class FO2Logger {
             return static_cast<int>(getVerbosity()) >= static_cast<int>(VerbosityLevel::DEBUG);
         }
 
-        //stampa per livello PHASES (>= 1)
+        // Logs macro-phase messages (level PHASES >= 1)
         static void logPhase(const std::string& msg){
             if(showsPhases()){
                 std::cout << "[FO2][PHASE] " << msg << std::endl;
             }
         }
 
-        //stampa per lo stato completo delle unità del problema per livello LEMMATA
+        // Logs complete state of problem units (level LEMMATA >= 2)
         static void logLemma(const std::string& title, Kernel::Problem &prb){
             if (showsLemmata()){
                 std::cout << "\n==================================================\n";
@@ -66,16 +66,16 @@ class FO2Logger {
                     std::cout << "  [" << ++count << "] " << u->toString() << "\n";
                 }
                 if (count == 0) {
-                    std::cout << "  (Nessuna unita' presente nel problema)\n";
+                    std::cout << "  (No units present in the problem)\n";
                 }
                 std::cout << "--------------------------------------------------\n\n";
             }
         }
 
-        // stampa sempre lo stato delle unita' del problema a prescindere dal livello di verbosita'
+        // Always logs problem units state regardless of verbosity level
         static void logAlways(const std::string& title, Kernel::Problem &prb){
             std::cout << "\n==================================================\n";
-            std::cout << "[FO2][OUTPUT FINALE] " << title << "\n";
+            std::cout << "[FO2][FINAL OUTPUT] " << title << "\n";
             std::cout << "==================================================\n";
 
             Kernel::UnitList::Iterator it(prb.units());
@@ -85,12 +85,12 @@ class FO2Logger {
                 std::cout << "  [" << ++count << "] " << u->toString() << "\n";
             }
             if (count == 0) {
-                std::cout << "  (Nessuna unita' presente nel problema)\n";
+                std::cout << "  (No units present in the problem)\n";
             }
             std::cout << "--------------------------------------------------\n\n";
         }
 
-        //stampa completa -Debug 
+        // Logs detailed debug messages (level DEBUG >= 3)
         static void logDebug(const std::string& msg) {
             if (showsDebug()) {
                 std::cout << "[FO2][DEBUG] " << msg << std::endl;

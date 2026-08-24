@@ -12,7 +12,7 @@ namespace FO2Fragment {
 
 FO2Result FO2Solver::solve(Problem& prb)
 {
-  FO2Logger::logPhase("Inizio Motore di Saturazione FO2 (Sezione 4)");
+  FO2Logger::logPhase("Starting FO2 Saturation Engine (Section 4)");
 
   std::deque<IndexedClause> passive;
   std::vector<IndexedClause> active;
@@ -25,14 +25,14 @@ FO2Result FO2Solver::solve(Problem& prb)
       Clause* cl = static_cast<Clause*>(u);
       IndexedClause icl = IndexedClause::fromClause(cl);
       if (icl.length() == 0) {
-        FO2Logger::logPhase("Clausola vuota iniziale trovata: UNSATISFIABLE");
+        FO2Logger::logPhase("Initial empty clause found: UNSATISFIABLE");
         return FO2Result::UNSATISFIABLE;
       }
       passive.push_back(icl);
     }
   }
 
-  FO2Logger::logDebug("[FO2Solver] Clausole passive iniziali: " + std::to_string(passive.size()));
+  FO2Logger::logDebug("[FO2Solver] Initial passive clauses: " + std::to_string(passive.size()));
 
   size_t iteration = 0;
   const size_t MAX_ITERATIONS = 10000; // Safeguard limit
@@ -44,7 +44,7 @@ FO2Result FO2Solver::solve(Problem& prb)
     passive.pop_front();
 
     if (given.length() == 0) {
-      FO2Logger::logPhase("Trovata clausola vuota derivata: UNSATISFIABLE");
+      FO2Logger::logPhase("Derived empty clause found: UNSATISFIABLE");
       return FO2Result::UNSATISFIABLE;
     }
 
@@ -55,7 +55,7 @@ FO2Result FO2Solver::solve(Problem& prb)
     for (const auto& act : active) {
       if (FO2Inferences::subsumes(act, given)) {
         isSubsumed = true;
-        FO2Logger::logDebug("[FO2Solver] Given subsumata da clausola attiva: " + act.toString());
+        FO2Logger::logDebug("[FO2Solver] Given subsumed by active clause: " + act.toString());
         break;
       }
     }
@@ -64,7 +64,7 @@ FO2Result FO2Solver::solve(Problem& prb)
     // Step 3: Splitting Rule check
     IndexedClause r1, r2;
     if (FO2Inferences::split(given, r1, r2)) {
-      FO2Logger::logDebug("[FO2Solver] Splitting applicato a Given: R1=" + r1.toString() + ", R2=" + r2.toString());
+      FO2Logger::logDebug("[FO2Solver] Splitting applied to Given: R1=" + r1.toString() + ", R2=" + r2.toString());
       passive.push_back(r1);
       passive.push_back(r2);
       continue;
@@ -74,7 +74,7 @@ FO2Result FO2Solver::solve(Problem& prb)
     std::vector<IndexedClause> newActive;
     for (const auto& act : active) {
       if (FO2Inferences::subsumes(given, act)) {
-        FO2Logger::logDebug("[FO2Solver] Clausola attiva rimpiazzata da sussunzione: " + act.toString());
+        FO2Logger::logDebug("[FO2Solver] Active clause replaced by subsumption: " + act.toString());
       } else {
         newActive.push_back(act);
       }
@@ -87,10 +87,10 @@ FO2Result FO2Solver::solve(Problem& prb)
         IndexedClause factorRes;
         if (FO2Inferences::factor(given, i, j, factorRes)) {
           if (factorRes.length() == 0) {
-            FO2Logger::logPhase("Trovata clausola vuota da Factoring: UNSATISFIABLE");
+            FO2Logger::logPhase("Empty clause derived from Factoring: UNSATISFIABLE");
             return FO2Result::UNSATISFIABLE;
           }
-          FO2Logger::logDebug("[FO2Solver] Generato fattore: " + factorRes.toStringWithSelection());
+          FO2Logger::logDebug("[FO2Solver] Generated factor: " + factorRes.toStringWithSelection());
           passive.push_back(factorRes);
         }
       }
@@ -105,20 +105,20 @@ FO2Result FO2Solver::solve(Problem& prb)
           IndexedClause resolvent1;
           if (FO2Inferences::resolve(given, idxG, act, idxA, resolvent1)) {
             if (resolvent1.length() == 0) {
-              FO2Logger::logPhase("Trovata clausola vuota da Risoluzione: UNSATISFIABLE");
+              FO2Logger::logPhase("Empty clause derived from Resolution: UNSATISFIABLE");
               return FO2Result::UNSATISFIABLE;
             }
-            FO2Logger::logDebug("[FO2Solver] Generato risolvente: " + resolvent1.toStringWithSelection());
+            FO2Logger::logDebug("[FO2Solver] Generated resolvent: " + resolvent1.toStringWithSelection());
             passive.push_back(resolvent1);
           }
 
           IndexedClause resolvent2;
           if (FO2Inferences::resolve(act, idxA, given, idxG, resolvent2)) {
             if (resolvent2.length() == 0) {
-              FO2Logger::logPhase("Trovata clausola vuota da Risoluzione: UNSATISFIABLE");
+              FO2Logger::logPhase("Empty clause derived from Resolution: UNSATISFIABLE");
               return FO2Result::UNSATISFIABLE;
             }
-            FO2Logger::logDebug("[FO2Solver] Generato risolvente inverso: " + resolvent2.toStringWithSelection());
+            FO2Logger::logDebug("[FO2Solver] Generated inverse resolvent: " + resolvent2.toStringWithSelection());
             passive.push_back(resolvent2);
           }
         }
@@ -128,7 +128,7 @@ FO2Result FO2Solver::solve(Problem& prb)
     active.push_back(given);
   }
 
-  FO2Logger::logPhase("Motore di Saturazione completato senza clausola vuota: SATISFIABLE");
+  FO2Logger::logPhase("Saturation Engine completed without empty clause: SATISFIABLE");
   return FO2Result::SATISFIABLE;
 }
 

@@ -15,10 +15,14 @@ enum class FO2Result {
   UNKNOWN
 };
 
+/**
+ * @brief Main decision procedure solver for the FO2 fragment (Section 4).
+ * Uses Given Clause saturation search with indexed subsumption, splitting, factoring, and Sigma2-selected resolution.
+ */
 class FO2Solver {
 public:
   /**
-   * @brief Solves an FO2 problem (Section 4 decision procedure).
+   * @brief Solves an FO2 problem.
    * Returns SATISFIABLE or UNSATISFIABLE.
    */
   static FO2Result solve(Kernel::Problem& prb);

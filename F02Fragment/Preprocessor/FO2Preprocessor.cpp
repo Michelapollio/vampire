@@ -87,9 +87,9 @@ bool Preprocessor::validateClause(Clause *cl, const char *&errorMessage)
 
 void Preprocessor::preprocess(Problem &prb)
 {
-  FO2Logger::logPhase("Inizio Preprocessing FO2");
+  FO2Logger::logPhase("Starting FO2 Preprocessing");
 
-  // Fase 1 & 2: NNF, Flattening, Skolemizzazione e Clausificazione (CNF)
+  // Phase 1 & 2: NNF, Flattening, Skolemization and Clausification (CNF)
   UnitList::DelIterator it(prb.units());
   Stack<Clause*> clauses;
   Shell::NewCNF newCnf(0);
@@ -118,7 +118,7 @@ void Preprocessor::preprocess(Problem &prb)
     }
   }
 
-  // Fase 3: Validazione vincoli S2 su tutte le clausole risultanti
+  // Phase 3: Validation of S2 constraints on all resulting clauses
   bool valid = true;
   UnitList::Iterator uit(prb.units());
   while (uit.hasNext()) {
@@ -135,10 +135,10 @@ void Preprocessor::preprocess(Problem &prb)
   }
 
   if (!valid) {
-    FO2Logger::logDebug("FO2Preprocessor: Alcune clausole pre-saturazione contengono componenti da dividere tramite Splitting.");
+    FO2Logger::logDebug("FO2Preprocessor: Some pre-saturation clauses contain components to be split via Splitting.");
   }
 
-  FO2Logger::logLemma("PROBLEMA DOPO IL PREPROCESSING", prb);
-  FO2Logger::logPhase("Preprocessing FO2 completato");
+  FO2Logger::logLemma("PROBLEM AFTER PREPROCESSING", prb);
+  FO2Logger::logPhase("FO2 Preprocessing completed");
 }
 } // namespace FO2Preprocessor
