@@ -125,6 +125,7 @@ void Options::init()
                                       "consequence_elimination",
                                       "model_check",
                                       "fo2",
+                                      "fo2_classifier",
                                       "output",
                                         "portfolio",
                                         "preprocess",

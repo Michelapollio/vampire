@@ -379,6 +379,7 @@ public:
     MODEL_CHECK,
     /** Check whether input problems belong to the FO2 fragment */
     FO2,
+    FO2_CLASSIFIER,
     /** this mode only outputs the input problem, without any preprocessing */
     OUTPUT,
     PORTFOLIO,

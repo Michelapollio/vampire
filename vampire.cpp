@@ -496,6 +496,22 @@ void fo2Mode(Problem* problem)
   vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
 }
 
+void fo2ClassifierMode(Problem* problem)
+{
+  ScopedPtr<Problem> prb(problem);
+
+  bool hasEq = false;
+  bool isFO2 = FO2Fragment::Classifier::isFO2(prb->units(), hasEq);
+
+  if (isFO2) {
+    std::cout << "The problem is in FO2 fragment." << std::endl;
+  } else {
+    std::cout << "The problem is not in FO2 fragment." << std::endl;
+  }
+
+  vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
+}
+
 void dispatchByMode(Problem* problem)
 
 {
@@ -596,6 +612,9 @@ void dispatchByMode(Problem* problem)
     break;
   case Options::Mode::FO2:
     fo2Mode(problem);
+    break;
+  case Options::Mode::FO2_CLASSIFIER:
+    fo2ClassifierMode(problem);
     break;
   }
 }
