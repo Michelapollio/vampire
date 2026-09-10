@@ -505,6 +505,11 @@ void fo2ClassifierMode(Problem* problem)
 
   if (isFO2) {
     std::cout << "The problem is in FO2 fragment." << std::endl;
+    if (hasEq || prb->hasEquality()) {
+      std::cout << "FO2_HAS_EQUALITY: 1" << std::endl;
+    } else {
+      std::cout << "FO2_HAS_EQUALITY: 0" << std::endl;
+    }
   } else {
     std::cout << "The problem is not in FO2 fragment." << std::endl;
   }

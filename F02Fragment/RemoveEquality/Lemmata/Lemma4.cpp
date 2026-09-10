@@ -20,6 +20,22 @@
 namespace FO2Fragment {
 namespace Lemmata {
 
+namespace {
+
+/**
+ * @brief Restituisce il termine con le variabili X0 e X1 scambiate (X0 <-> X1).
+ */
+Kernel::TermList swapVar(Kernel::TermList t)
+{
+  if (t.isVar()) {
+    if (t.var() == 0) return Kernel::TermList::var(1);
+    if (t.var() == 1) return Kernel::TermList::var(0);
+  }
+  return t;
+}
+
+} // namespace
+
 /**
  * @brief Controlla se un letterale contiene sia la variabile 0 (X0) che la variabile 1 (X1).
  */
@@ -57,14 +73,6 @@ bool Lemma4::areResolvable(Kernel::Literal* litA, Kernel::Literal* litB, bool& n
     return true;
   }
 
-  auto swapVar = [](Kernel::TermList t) {
-    if (t.isVar()) {
-      if (t.var() == 0) return Kernel::TermList::var(1);
-      if (t.var() == 1) return Kernel::TermList::var(0);
-    }
-    return t;
-  };
-
   if (*litA->nthArgument(0) == swapVar(*litB->nthArgument(0)) &&
       *litA->nthArgument(1) == swapVar(*litB->nthArgument(1))) {
     needsSwap = true;
@@ -79,14 +87,6 @@ bool Lemma4::areResolvable(Kernel::Literal* litA, Kernel::Literal* litB, bool& n
  */
 Kernel::Literal* Lemma4::swapVarsInLiteral(Kernel::Literal* lit)
 {
-  auto swapVar = [](Kernel::TermList t) {
-    if (t.isVar()) {
-      if (t.var() == 0) return Kernel::TermList::var(1);
-      if (t.var() == 1) return Kernel::TermList::var(0);
-    }
-    return t;
-  };
-
   if (lit->isEquality()) {
     return Kernel::Literal::createEquality(lit->polarity(), 
                                            swapVar(*lit->nthArgument(0)), 

@@ -1,6 +1,6 @@
 #include "FO2Preprocessor.hpp"
 
-#include "Shell/Flattening.hpp"
+#include "Shell/Flattening.hpp" 
 #include "Shell/NNF.hpp"
 #include "Shell/Skolem.hpp"
 #include "Shell/CNF.hpp"
