@@ -1,0 +1,11 @@
+# Comando Bash utilizzato per eseguire il benchmark comparativo con Fair Comparison, Memory Limit (4GB) & Time Limit di 30 minuti (1800s)
+# sui file della cartella TPTP (es. tests/fo2_datasets/tptp/fof_equality/) o Generati (es. tests/fo2_datasets/generated/equalityscaling/)
+
+# Modalità raccomandata per benchmark TPTP:
+# ./fo2_scripts/run_comparative_benchmark.sh tests/fo2_datasets/tptp/fof_equality 1800 confronto_tptp_fof_eq 4
+
+# Modalità raccomandata per benchmark generati sinteticamente (tesi Borgia):
+# ./fo2_scripts/run_comparative_benchmark.sh tests/fo2_datasets/generated/equalityscaling 1800 confronto_gen_eqscaling 4
+
+# Comando inline sequenziale (Fair Comparison: --sa otter -av off -updr off -fs off -m 4096):
+rm -f confronto_completo.log && for file in tests/fo2_datasets/tptp/fof_equality/*.p; do echo "==========================================" >> confronto_completo.log; echo "TEST: $file" >> confronto_completo.log; echo "--- CLASSIC VAMPIRE (FAIR) ---" >> confronto_completo.log; ./build/vampire --include tests/tptp_raw -m 4096 --sa otter -av off -updr off -fs off --time_limit 1800 "$file" >> confronto_completo.log 2>&1; echo "--- FO2 VAMPIRE ---" >> confronto_completo.log; ./build/vampire --include tests/tptp_raw -m 4096 --mode fo2 --time_limit 1800 "$file" >> confronto_completo.log 2>&1; done

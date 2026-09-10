@@ -4,7 +4,7 @@
 # Confronta Classic Vampire vs FO2 Vampire sui file di un dataset.
 # Usage: ./scripts/run_comparative_benchmark.sh [DATASET_DIR] [TIME_LIMIT_SEC] [OUTPUT_PREFIX] [JOBS]
 
-DATASET_DIR="${1:-tests/fo2_datasets/fof_equality}"
+DATASET_DIR="${1:-tests/fo2_datasets/tptp/fof_equality}"
 TIME_LIMIT="${2:-1800}" # Default: 1800s (30 minuti)
 OUTPUT_PREFIX="${3:-confronto_fof_eq}"
 JOBS="${4:-$(nproc 2>/dev/null || echo 4)}"

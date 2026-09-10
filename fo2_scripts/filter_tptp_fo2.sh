@@ -4,7 +4,7 @@
 # Usage: ./scripts/filter_tptp_fo2.sh [INPUT_DIR] [OUTPUT_DIR] [VAMPIRE_EXEC] [JOBS]
 
 INPUT_DIR="${1:-tests/tptp_raw/Problems}"
-OUTPUT_DIR="${2:-tests/fo2_datasets}"
+OUTPUT_DIR="${2:-tests/fo2_datasets/tptp}"
 VAMPIRE_EXEC="${3:-./build/vampire}"
 JOBS="${4:-$(nproc 2>/dev/null || echo 4)}"
 

@@ -1,0 +1,297 @@
+File,Classic_Status,Classic_Time,FO2_Status,FO2_Time
+unsat_eq2_22.p,Refutation,0.047,Satisfiable,0.001
+sat_eq6_6.p,Satisfiable,0.019,Satisfiable,0.001
+unsat_eq6_33.p,Refutation,0.003,Satisfiable,0.001
+unsat_eq4_14.p,Refutation,0.006,Satisfiable,0.0000
+unsat_eq6_22.p,Refutation,0.006,Satisfiable,0.001
+unsat_eq8_32.p,Refutation,0.004,Satisfiable,0.001
+sat_eq4_32.p,Satisfiable,0.002,Satisfiable,0.0000
+unsat_eq2_14.p,Refutation,0.004,Satisfiable,0.0000
+sat_eq8_5.p,Time limit,3.001,Satisfiable,0.079
+unsat_eq4_36.p,Refutation,1.254,Satisfiable,0.425
+unsat_eq6_1.p,Refutation,0.008,Satisfiable,0.001
+sat_eq4_3.p,Time limit,3.0000,Satisfiable,1.071
+unsat_eq6_14.p,Refutation,0.006,Satisfiable,0.001
+unsat_eq2_5.p,Refutation,3.510,Satisfiable,0.870
+sat_eq4_24.p,Satisfiable,0.004,Satisfiable,0.001
+unsat_eq4_15.p,Refutation,0.003,Satisfiable,0.001
+sat_eq4_21.p,Satisfiable,0.004,Satisfiable,0.001
+unsat_eq6_31.p,Refutation,1.0000,Satisfiable,0.220
+sat_eq8_13.p,Time limit,3.0000,Satisfiable,0.488
+sat_eq6_31.p,Satisfiable,0.044,Satisfiable,0.001
+unsat_eq4_23.p,Refutation,3.127,Satisfiable,0.864
+unsat_eq6_27.p,Refutation,0.046,Satisfiable,0.001
+sat_eq4_13.p,Satisfiable,0.004,Satisfiable,0.0000
+sat_eq4_12.p,Time limit,3.0000,Satisfiable,0.578
+unsat_eq2_12.p,Refutation,1.732,Satisfiable,0.466
+unsat_eq6_16.p,Time limit,3.0000,Satisfiable,1.092
+sat_eq8_6.p,Satisfiable,0.005,Satisfiable,0.001
+unsat_eq8_10.p,Refutation,0.044,Satisfiable,0.001
+unsat_eq6_21.p,Refutation,0.046,Satisfiable,0.001
+unsat_eq2_25.p,Refutation,1.823,Satisfiable,0.333
+sat_eq6_32.p,Satisfiable,0.042,Satisfiable,0.001
+sat_eq2_2.p,Satisfiable,1.488,Satisfiable,0.220
+unsat_eq2_23.p,Refutation,0.045,Satisfiable,0.001
+sat_eq2_34.p,Satisfiable,0.076,Satisfiable,0.001
+unsat_eq2_1.p,Time limit,3.0000,Satisfiable,1.484
+unsat_eq8_21.p,Refutation,0.007,Satisfiable,0.001
+sat_eq8_17.p,Satisfiable,0.229,Satisfiable,0.035
+unsat_eq8_17.p,Refutation,0.010,Satisfiable,0.001
+sat_eq4_30.p,Satisfiable,0.043,Satisfiable,0.001
+unsat_eq6_8.p,Refutation,0.049,Satisfiable,0.001
+unsat_eq4_6.p,Refutation,0.032,Satisfiable,0.001
+sat_eq6_28.p,Satisfiable,0.010,Satisfiable,0.001
+sat_eq8_4.p,Satisfiable,0.063,Satisfiable,0.002
+sat_eq2_15.p,Satisfiable,0.044,Satisfiable,0.001
+sat_eq4_28.p,Refutation,0.043,Satisfiable,0.004
+sat_eq2_29.p,Satisfiable,0.003,Satisfiable,0.001
+unsat_eq6_25.p,Refutation,0.046,Satisfiable,0.001
+sat_eq2_22.p,Satisfiable,0.042,Satisfiable,0.001
+unsat_eq2_37.p,Time limit,3.0000,Satisfiable,0.302
+sat_eq4_15.p,Time limit,3.0000,Satisfiable,1.137
+sat_eq2_20.p,Satisfiable,0.005,Satisfiable,0.001
+unsat_eq4_10.p,Refutation,0.007,Satisfiable,0.001
+unsat_eq8_25.p,Refutation,3.222,Satisfiable,0.862
+sat_eq4_2.p,Time limit,3.001,Satisfiable,0.989
+sat_eq8_35.p,Time limit,3.0000,Satisfiable,1.369
+sat_eq8_30.p,Satisfiable,0.006,Satisfiable,0.002
+unsat_eq6_32.p,Time limit,3.0000,Time limit,3.0000
+sat_eq6_23.p,Time limit,3.0000,Satisfiable,1.046
+sat_eq2_4.p,Satisfiable,1.764,Satisfiable,0.156
+unsat_eq8_28.p,Refutation,0.044,Satisfiable,0.001
+sat_eq2_12.p,Satisfiable,0.045,Satisfiable,0.001
+sat_eq4_33.p,Satisfiable,0.043,Satisfiable,0.001
+unsat_eq4_21.p,Refutation,0.046,Satisfiable,0.001
+sat_eq6_3.p,Satisfiable,0.035,Satisfiable,0.002
+unsat_eq4_4.p,Refutation,1.433,Satisfiable,0.491
+sat_eq4_7.p,Time limit,3.0000,Satisfiable,1.548
+sat_eq4_4.p,Satisfiable,0.044,Satisfiable,0.001
+unsat_eq6_19.p,Refutation,0.040,Satisfiable,0.002
+unsat_eq2_10.p,Refutation,0.048,Satisfiable,0.001
+sat_eq6_15.p,Satisfiable,0.045,Satisfiable,0.001
+unsat_eq8_9.p,Refutation,0.344,Satisfiable,0.065
+unsat_eq4_28.p,Refutation,0.042,Satisfiable,0.001
+unsat_eq8_26.p,Refutation,0.016,Satisfiable,0.001
+sat_eq8_34.p,Satisfiable,0.044,Refutation,0.003
+sat_eq6_12.p,Satisfiable,0.087,Satisfiable,0.001
+unsat_eq6_20.p,Refutation,0.007,Satisfiable,0.001
+sat_eq6_24.p,Time limit,3.0000,Satisfiable,1.133
+sat_eq6_26.p,Satisfiable,0.005,Satisfiable,0.001
+unsat_eq8_2.p,Refutation,0.049,Satisfiable,0.002
+sat_eq4_11.p,Satisfiable,0.049,Satisfiable,0.001
+sat_eq2_17.p,Satisfiable,0.044,Satisfiable,0.001
+sat_eq6_18.p,Satisfiable,1.659,Satisfiable,0.301
+unsat_eq4_17.p,Refutation,0.044,Satisfiable,0.001
+sat_eq4_18.p,Satisfiable,0.066,Satisfiable,0.001
+sat_eq8_12.p,Satisfiable,0.010,Satisfiable,0.001
+sat_eq2_7.p,Time limit,3.001,Satisfiable,1.004
+sat_eq8_26.p,Satisfiable,0.041,Satisfiable,0.001
+unsat_eq6_24.p,Refutation,0.008,Satisfiable,0.001
+unsat_eq2_4.p,Refutation,0.010,Satisfiable,0.001
+unsat_eq4_3.p,Refutation,0.004,Satisfiable,0.001
+sat_eq6_8.p,Satisfiable,1.001,Satisfiable,0.219
+sat_eq8_36.p,Satisfiable,0.051,Satisfiable,0.002
+unsat_eq2_27.p,Refutation,0.010,Satisfiable,0.001
+sat_eq4_9.p,Time limit,3.0000,Satisfiable,1.087
+sat_eq2_16.p,Satisfiable,0.043,Satisfiable,0.001
+sat_eq4_22.p,Satisfiable,0.007,Satisfiable,0.001
+unsat_eq6_12.p,Refutation,0.045,Satisfiable,0.001
+unsat_eq2_26.p,Refutation,0.045,Satisfiable,0.001
+unsat_eq2_34.p,Time limit,3.001,Satisfiable,0.916
+unsat_eq8_4.p,Refutation,0.046,Satisfiable,0.002
+sat_eq8_8.p,Satisfiable,0.045,Satisfiable,0.001
+sat_eq2_19.p,Satisfiable,0.048,Satisfiable,0.001
+unsat_eq8_11.p,Refutation,2.136,Satisfiable,0.578
+sat_eq4_14.p,Satisfiable,0.005,Satisfiable,0.001
+sat_eq6_7.p,Time limit,3.001,Satisfiable,2.463
+unsat_eq8_15.p,Refutation,0.005,Satisfiable,0.001
+sat_eq6_36.p,Satisfiable,0.043,Satisfiable,0.001
+sat_eq8_20.p,Satisfiable,0.051,Satisfiable,0.001
+sat_eq4_27.p,Satisfiable,0.013,Satisfiable,0.001
+unsat_eq8_13.p,Refutation,0.037,Satisfiable,0.001
+unsat_eq6_13.p,Refutation,0.044,Satisfiable,0.002
+unsat_eq2_31.p,Refutation,0.008,Satisfiable,0.001
+sat_eq6_1.p,Refutation,0.205,Satisfiable,0.031
+unsat_eq2_11.p,Refutation,0.042,Satisfiable,0.001
+sat_eq8_14.p,Satisfiable,0.046,Satisfiable,0.002
+sat_eq2_33.p,Satisfiable,0.031,Satisfiable,0.001
+unsat_eq8_37.p,Refutation,0.040,Satisfiable,0.001
+sat_eq6_5.p,Satisfiable,0.046,Satisfiable,0.001
+unsat_eq8_5.p,Refutation,0.024,Satisfiable,0.002
+sat_eq2_10.p,Satisfiable,0.005,Satisfiable,0.001
+unsat_eq4_25.p,Time limit,3.001,Satisfiable,2.700
+unsat_eq2_18.p,Refutation,0.045,Satisfiable,0.001
+sat_eq8_23.p,Satisfiable,0.043,Satisfiable,0.001
+unsat_eq8_35.p,Time limit,3.0000,Satisfiable,0.956
+sat_eq6_29.p,Satisfiable,0.054,Satisfiable,0.001
+unsat_eq6_30.p,Refutation,0.046,Satisfiable,0.002
+sat_eq8_16.p,Refutation,0.005,Refutation,0.002
+unsat_eq2_17.p,Refutation,0.038,Satisfiable,0.001
+sat_eq2_14.p,Satisfiable,0.043,Satisfiable,0.001
+sat_eq8_2.p,Satisfiable,0.046,Satisfiable,0.001
+unsat_eq8_22.p,Refutation,0.049,Satisfiable,0.001
+sat_eq4_16.p,Satisfiable,0.044,Satisfiable,0.001
+unsat_eq8_18.p,Refutation,0.038,Satisfiable,0.001
+sat_eq2_5.p,Time limit,3.0000,Satisfiable,0.143
+unsat_eq6_11.p,Refutation,0.050,Satisfiable,0.001
+sat_eq8_29.p,Satisfiable,0.030,Satisfiable,0.001
+unsat_eq2_15.p,Refutation,0.046,Satisfiable,0.001
+unsat_eq4_5.p,Refutation,0.039,Satisfiable,0.001
+unsat_eq2_24.p,Refutation,0.007,Satisfiable,0.001
+unsat_eq4_29.p,Refutation,0.004,Satisfiable,0.001
+unsat_eq6_7.p,Refutation,0.051,Satisfiable,0.002
+unsat_eq6_35.p,Refutation,0.044,Satisfiable,0.002
+unsat_eq2_30.p,Time limit,3.0000,Satisfiable,2.455
+sat_eq8_33.p,Satisfiable,0.011,Satisfiable,0.002
+unsat_eq4_37.p,Refutation,0.010,Satisfiable,0.002
+sat_eq6_35.p,Satisfiable,0.014,Satisfiable,0.001
+sat_eq4_20.p,Satisfiable,0.011,Satisfiable,0.002
+unsat_eq4_11.p,Refutation,0.013,Satisfiable,0.002
+sat_eq6_9.p,Satisfiable,1.139,Satisfiable,0.145
+sat_eq4_36.p,Satisfiable,0.045,Satisfiable,0.001
+unsat_eq6_15.p,Time limit,3.0000,Satisfiable,1.273
+sat_eq8_21.p,Satisfiable,0.044,Satisfiable,0.001
+sat_eq2_21.p,Satisfiable,0.043,Satisfiable,0.001
+unsat_eq6_17.p,Refutation,0.008,Satisfiable,0.001
+sat_eq8_10.p,Satisfiable,0.046,Satisfiable,0.001
+unsat_eq4_9.p,Time limit,3.0000,Satisfiable,1.780
+sat_eq2_26.p,Satisfiable,0.049,Satisfiable,0.001
+sat_eq4_26.p,Time limit,3.001,Satisfiable,0.592
+unsat_eq6_9.p,Refutation,0.049,Satisfiable,0.001
+unsat_eq6_2.p,Refutation,1.126,Satisfiable,0.305
+unsat_eq4_2.p,Refutation,0.057,Satisfiable,0.002
+sat_eq2_6.p,Satisfiable,0.003,Satisfiable,0.001
+sat_eq4_10.p,Satisfiable,0.046,Satisfiable,0.002
+sat_eq6_10.p,Satisfiable,0.011,Satisfiable,0.001
+unsat_eq8_7.p,Refutation,0.010,Satisfiable,0.001
+sat_eq8_3.p,Satisfiable,2.561,Satisfiable,0.316
+sat_eq2_13.p,Satisfiable,2.943,Satisfiable,0.317
+unsat_eq8_30.p,Refutation,0.048,Satisfiable,0.002
+sat_eq4_34.p,Refutation,0.005,Satisfiable,0.001
+sat_eq2_37.p,Satisfiable,0.045,Satisfiable,0.001
+unsat_eq8_14.p,Refutation,1.549,Satisfiable,0.145
+sat_eq6_34.p,Satisfiable,0.043,Satisfiable,0.001
+unsat_eq8_8.p,Refutation,0.032,Satisfiable,0.001
+sat_eq6_14.p,Satisfiable,0.069,Satisfiable,0.014
+unsat_eq8_6.p,Refutation,0.050,Satisfiable,0.001
+sat_eq6_16.p,Satisfiable,0.008,Satisfiable,0.001
+sat_eq8_19.p,Time limit,3.0000,Satisfiable,2.229
+unsat_eq4_16.p,Refutation,0.049,Satisfiable,0.001
+sat_eq2_36.p,Time limit,3.0000,Satisfiable,0.992
+unsat_eq6_29.p,Refutation,0.053,Satisfiable,0.002
+sat_eq8_11.p,Satisfiable,0.043,Satisfiable,0.001
+unsat_eq6_28.p,Refutation,0.013,Satisfiable,0.001
+unsat_eq2_32.p,Refutation,0.021,Satisfiable,0.001
+sat_eq6_25.p,Satisfiable,0.004,Satisfiable,0.002
+sat_eq4_37.p,Time limit,3.0000,Satisfiable,0.941
+unsat_eq2_33.p,Refutation,0.046,Satisfiable,0.001
+unsat_eq2_21.p,Time limit,3.0000,Satisfiable,1.710
+sat_eq6_20.p,Satisfiable,0.045,Satisfiable,0.001
+unsat_eq2_3.p,Refutation,0.042,Satisfiable,0.001
+sat_eq8_24.p,Satisfiable,0.027,Satisfiable,0.002
+unsat_eq6_10.p,Refutation,0.044,Satisfiable,0.001
+unsat_eq2_9.p,Refutation,0.050,Satisfiable,0.001
+unsat_eq2_16.p,Refutation,0.042,Satisfiable,0.001
+sat_eq4_25.p,Satisfiable,1.849,Satisfiable,0.312
+sat_eq8_15.p,Satisfiable,0.047,Satisfiable,0.002
+sat_eq4_1.p,Time limit,3.001,Satisfiable,1.881
+sat_eq2_18.p,Satisfiable,2.064,Satisfiable,0.470
+unsat_eq4_1.p,Refutation,0.053,Satisfiable,0.001
+sat_eq4_31.p,Refutation,0.044,Satisfiable,0.001
+unsat_eq8_36.p,Time limit,3.001,Satisfiable,1.469
+unsat_eq2_8.p,Time limit,3.0000,Satisfiable,1.613
+unsat_eq2_7.p,Refutation,1.858,Satisfiable,0.344
+unsat_eq6_6.p,Refutation,0.081,Satisfiable,0.001
+sat_eq6_27.p,Time limit,3.0000,Satisfiable,0.768
+sat_eq8_1.p,Satisfiable,0.007,Satisfiable,0.001
+unsat_eq8_20.p,Refutation,0.006,Satisfiable,0.001
+unsat_eq6_37.p,Refutation,0.039,Satisfiable,0.002
+sat_eq2_31.p,Satisfiable,0.046,Satisfiable,0.001
+sat_eq6_11.p,Satisfiable,0.008,Satisfiable,0.002
+unsat_eq4_35.p,Refutation,0.005,Satisfiable,0.002
+sat_eq2_11.p,Time limit,3.0000,Satisfiable,0.765
+unsat_eq2_6.p,Refutation,0.027,Satisfiable,0.001
+sat_eq2_8.p,Satisfiable,0.048,Satisfiable,0.001
+unsat_eq8_27.p,Refutation,1.973,Satisfiable,0.343
+unsat_eq8_24.p,Refutation,0.093,Satisfiable,0.002
+unsat_eq8_16.p,Refutation,0.012,Satisfiable,0.002
+sat_eq6_21.p,Satisfiable,0.008,Satisfiable,0.001
+unsat_eq8_34.p,Refutation,0.007,Satisfiable,0.002
+unsat_eq8_12.p,Refutation,0.012,Satisfiable,0.002
+sat_eq8_22.p,Satisfiable,0.047,Satisfiable,0.001
+sat_eq2_27.p,Satisfiable,0.038,Satisfiable,0.001
+sat_eq2_35.p,Satisfiable,0.010,Satisfiable,0.001
+sat_eq2_30.p,Satisfiable,0.013,Satisfiable,0.001
+sat_eq2_24.p,Satisfiable,0.006,Satisfiable,0.001
+unsat_eq2_35.p,Time limit,3.0000,Satisfiable,1.659
+unsat_eq2_13.p,Refutation,0.049,Satisfiable,0.001
+unsat_eq4_7.p,Time limit,3.0000,Satisfiable,1.624
+unsat_eq8_31.p,Time limit,3.0000,Satisfiable,2.022
+unsat_eq6_36.p,Refutation,0.013,Satisfiable,0.002
+unsat_eq4_27.p,Time limit,3.0000,Satisfiable,2.442
+unsat_eq4_22.p,Refutation,0.014,Satisfiable,0.001
+unsat_eq8_33.p,Refutation,0.044,Satisfiable,0.001
+sat_eq2_25.p,Satisfiable,1.215,Satisfiable,0.263
+sat_eq4_5.p,Satisfiable,1.002,Satisfiable,0.150
+unsat_eq6_34.p,Refutation,0.050,Satisfiable,0.001
+sat_eq6_17.p,Time limit,3.001,Satisfiable,0.923
+sat_eq2_28.p,Satisfiable,2.542,Satisfiable,0.437
+sat_eq8_7.p,Satisfiable,0.006,Satisfiable,0.001
+unsat_eq4_24.p,Refutation,0.045,Satisfiable,0.002
+unsat_eq6_4.p,Refutation,1.511,Satisfiable,0.525
+unsat_eq2_2.p,Refutation,2.175,Satisfiable,0.459
+unsat_eq6_23.p,Refutation,0.052,Satisfiable,0.002
+sat_eq4_23.p,Time limit,3.0000,Satisfiable,0.446
+unsat_eq8_29.p,Refutation,0.052,Satisfiable,0.001
+sat_eq6_22.p,Time limit,3.0000,Satisfiable,0.687
+sat_eq6_37.p,Time limit,3.0000,Satisfiable,0.270
+sat_eq4_35.p,Satisfiable,0.029,Satisfiable,0.001
+sat_eq2_3.p,Satisfiable,0.050,Satisfiable,0.001
+unsat_eq6_5.p,Refutation,0.010,Satisfiable,0.003
+unsat_eq4_33.p,Time limit,3.001,Satisfiable,1.664
+unsat_eq8_3.p,Refutation,0.050,Satisfiable,0.002
+sat_eq8_28.p,Satisfiable,0.067,Satisfiable,0.002
+sat_eq6_13.p,Satisfiable,0.044,Satisfiable,0.001
+sat_eq6_30.p,Refutation,0.048,Satisfiable,0.002
+unsat_eq4_13.p,Time limit,3.001,Satisfiable,0.845
+unsat_eq2_28.p,Refutation,0.010,Satisfiable,0.002
+sat_eq4_19.p,Satisfiable,0.010,Satisfiable,0.001
+unsat_eq4_30.p,Refutation,0.047,Satisfiable,0.001
+sat_eq6_2.p,Time limit,3.0000,Satisfiable,1.519
+unsat_eq8_19.p,Refutation,0.009,Satisfiable,0.002
+unsat_eq6_18.p,Refutation,0.045,Satisfiable,0.001
+unsat_eq4_32.p,Refutation,0.046,Satisfiable,0.001
+sat_eq4_29.p,Refutation,3.115,Satisfiable,0.733
+sat_eq6_33.p,Satisfiable,0.003,Satisfiable,0.001
+sat_eq4_17.p,Satisfiable,0.047,Satisfiable,0.002
+sat_eq4_8.p,Refutation,0.043,Satisfiable,0.002
+unsat_eq8_23.p,Refutation,0.017,Satisfiable,0.001
+unsat_eq4_20.p,Refutation,0.044,Satisfiable,0.001
+sat_eq8_9.p,Satisfiable,0.060,Satisfiable,0.001
+unsat_eq2_20.p,Refutation,0.039,Satisfiable,0.001
+sat_eq8_25.p,Satisfiable,0.055,Satisfiable,0.002
+sat_eq6_19.p,Time limit,3.0000,Satisfiable,1.784
+sat_eq8_32.p,Satisfiable,0.051,Satisfiable,0.001
+sat_eq8_27.p,Time limit,3.0000,Satisfiable,1.524
+unsat_eq2_29.p,Refutation,0.047,Satisfiable,0.001
+unsat_eq4_12.p,Refutation,0.044,Satisfiable,0.001
+sat_eq6_4.p,Satisfiable,0.006,Satisfiable,0.001
+unsat_eq6_26.p,Refutation,0.046,Satisfiable,0.001
+sat_eq8_37.p,Time limit,3.0000,Satisfiable,0.427
+unsat_eq4_31.p,Refutation,0.007,Satisfiable,0.002
+sat_eq2_32.p,Satisfiable,0.011,Satisfiable,0.001
+unsat_eq2_36.p,Time limit,3.0000,Satisfiable,1.396
+unsat_eq4_34.p,Refutation,0.048,Satisfiable,0.001
+sat_eq2_9.p,Satisfiable,1.391,Satisfiable,0.427
+unsat_eq4_26.p,Refutation,0.059,Satisfiable,0.002
+unsat_eq4_18.p,Time limit,3.0000,Satisfiable,1.820
+sat_eq4_6.p,Satisfiable,0.046,Satisfiable,0.001
+unsat_eq8_1.p,Refutation,0.046,Satisfiable,0.002
+sat_eq8_18.p,Satisfiable,0.056,Satisfiable,0.001
+unsat_eq2_19.p,Refutation,0.043,Satisfiable,0.001
+sat_eq2_23.p,Satisfiable,0.007,Satisfiable,0.001
+unsat_eq4_8.p,Refutation,0.048,Satisfiable,0.001
+sat_eq2_1.p,Time limit,3.001,Satisfiable,1.721
+unsat_eq4_19.p,Time limit,3.0000,Satisfiable,0.705
+unsat_eq6_3.p,Refutation,1.721,Satisfiable,0.442
+sat_eq8_31.p,Satisfiable,1.498,Satisfiable,0.199

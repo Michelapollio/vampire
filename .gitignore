@@ -30,6 +30,7 @@ valgrind.supp
 !checks/**/*.p
 *.tptp
 *.txt
+!comando_benchmark.txt
 *.smt2
 *.cnf
 tags
@@ -44,3 +45,7 @@ cmake-build
 **/.*.swo
 .ccls-cache
 .cache/
+
+*.tgz
+tests/tptp_raw/
+
