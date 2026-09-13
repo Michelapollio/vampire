@@ -50,6 +50,8 @@ set(UNIT_TESTS
     UnitTests/tDeque.cpp
     UnitTests/tDisagreement.cpp
     UnitTests/tDynamicHeap.cpp
+    UnitTests/tFO2_RemoveEquality_Equisat.cpp
+    UnitTests/tFO2_Resolution.cpp
     UnitTests/tFunctionDefinitionHandler.cpp
     UnitTests/tIndexManager.cpp
     UnitTests/tInferences_AnswerLiteralProcessors.cpp
