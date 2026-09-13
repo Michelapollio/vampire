@@ -24,8 +24,9 @@ namespace FO2Preprocessor {
     /**
      * @brief Preprocesses an FO2 problem into CNF form and validates S2 constraints.
      * @param prb The problem instance to preprocess.
+     * @return true if preprocessed clauses satisfy S2 constraints, false otherwise.
      */
-    static void preprocess(Problem &prb);
+    static bool preprocess(Problem &prb);
 
   private:
     /**

@@ -480,18 +480,29 @@ void fo2Mode(Problem* problem)
     FO2Fragment::RemoveEquality::removeEquality(*prb);
   }
 
-  FO2Preprocessor::Preprocessor::preprocess(*prb);
+  FO2Fragment::FO2Logger::logPhase("Inizio Preprocessing FO2 (NNF/Clausificazione/Scott Normal Form)");
+  bool isS2Valid = FO2Preprocessor::Preprocessor::preprocess(*prb);
+
+  if (!isS2Valid) {
+    FO2Fragment::FO2Logger::logPhase("FO2 Preprocessor: S2 invariant violation detected. Safe fallback to Vampire Standard Mode.");
+    vampireMode(prb.release());
+    return;
+  }
 
   FO2Fragment::FO2Logger::logAlways("STATO FINALE DEL PROBLEMA", *prb);
 
   FO2Fragment::FO2Result res = FO2Fragment::FO2Solver::solve(*prb);
   if (res == FO2Fragment::FO2Result::SATISFIABLE) {
     env.statistics->terminationReason = TerminationReason::SATISFIABLE;
+    std::cout << "% SZS status Satisfiable for " << env.options->problemName() << std::endl;
   } else if (res == FO2Fragment::FO2Result::UNSATISFIABLE) {
     env.statistics->terminationReason = TerminationReason::REFUTATION;
+    std::cout << "% SZS status Unsatisfiable for " << env.options->problemName() << std::endl;
   }
 
-  UIHelper::outputResult(std::cout);
+  if (env.statistics->refutation) {
+    UIHelper::outputResult(std::cout);
+  }
 
   vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
 }

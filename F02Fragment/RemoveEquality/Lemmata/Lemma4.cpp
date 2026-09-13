@@ -351,8 +351,13 @@ void Lemma4::applyLemma4(Kernel::Problem &prb)
       if (stype == FO2Fragment::ScottType::TYPE_3) {
         std::vector<Kernel::Clause*> extracted;
         extractType3Clauses(fu, extracted);
-        for (Kernel::Clause* cl : extracted) {
-          passive3.push_back(cl);
+        if (extracted.empty()) {
+          FO2Logger::logDebug("[Lemma 4] Non-clausal FormulaUnit kept in nonClauseUnits: " + fu->toString().substr(0,50) + "...");
+          nonClauseUnits.push_back(unit);
+        } else {
+          for (Kernel::Clause* cl : extracted) {
+            passive3.push_back(cl);
+          }
         }
       } else {
         FO2Logger::logDebug("[Lemma 4] Formula Tipo 1/2 (non clausola, mantenuta): " + fu->toString().substr(0,50) + "...");

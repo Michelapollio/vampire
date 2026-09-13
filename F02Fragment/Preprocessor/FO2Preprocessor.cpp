@@ -6,6 +6,7 @@
 #include "Shell/CNF.hpp"
 #include "Shell/NewCNF.hpp"
 #include "Shell/Rectify.hpp"
+#include "Shell/Naming.hpp"
 #include "Kernel/SortHelper.hpp"
 #include "Kernel/Clause.hpp"
 #include "Kernel/Term.hpp"
@@ -63,8 +64,28 @@ bool Preprocessor::validateClause(Clause *cl, const char *&errorMessage)
     clauseVars.insert(vit.next());
   }
 
+  bool hasGroundLiteral = false;
+  bool hasNonGroundLiteral = false;
+  bool hasBivariateLiteral = false;
+
   for (int i = 0; i < (int)cl->length(); ++i) {
     Literal *lit = (*cl)[i];
+    DHSet<unsigned> litVars;
+    VariableIterator lvit(lit);
+    while (lvit.hasNext()) {
+      litVars.insert(lvit.next().var());
+    }
+
+    if (litVars.size() == 0) {
+      hasGroundLiteral = true;
+    } else {
+      hasNonGroundLiteral = true;
+    }
+
+    if (clauseVars.size() == 2 && litVars.size() == 2) {
+      hasBivariateLiteral = true;
+    }
+
     unsigned arity = lit->arity();
     for (unsigned a = 0; a < arity; ++a) {
       const TermList *tl = lit->nthArgument(a);
@@ -82,17 +103,28 @@ bool Preprocessor::validateClause(Clause *cl, const char *&errorMessage)
     }
   }
 
+  if (hasGroundLiteral && hasNonGroundLiteral) {
+    errorMessage = "FO2Preprocessor: clause containing ground literal must be entirely ground (violates S2 ground invariant).";
+    return false;
+  }
+
+  if (clauseVars.size() == 2 && !hasBivariateLiteral) {
+    errorMessage = "FO2Preprocessor: 2-variable clause must contain at least one literal with both variables (violates S2 covering).";
+    return false;
+  }
+
   return true;
 }
 
-void Preprocessor::preprocess(Problem &prb)
+bool Preprocessor::preprocess(Problem &prb)
 {
   FO2Logger::logPhase("Starting FO2 Preprocessing");
 
-  // Phase 1 & 2: NNF, Flattening, Skolemization and Clausification (CNF)
+  // Phase 1 & 2: NNF, Naming, Flattening, Skolemization and Clausification (CNF)
   UnitList::DelIterator it(prb.units());
   Stack<Clause*> clauses;
   Shell::NewCNF newCnf(0);
+  Shell::Naming naming(1, false, false);
 
   while (it.hasNext()) {
     Unit *u = it.next();
@@ -101,9 +133,17 @@ void Preprocessor::preprocess(Problem &prb)
 
     if (!u->isClause()) {
       FormulaUnit *fu = static_cast<FormulaUnit *>(u);
-      FO2Logger::logDebug("applying Rectify/NNF/flattening/skolemisation/clausification");
+      FO2Logger::logDebug("applying Rectify/Naming/NNF/flattening/skolemisation/clausification");
       fu = Shell::Rectify::rectify(fu);
       fu = Shell::NNF::nnf(fu);
+      UnitList* defs = nullptr;
+      fu = naming.apply(fu, defs);
+      if (defs) {
+        UnitList::Iterator defIt(defs);
+        while (defIt.hasNext()) {
+          it.insert(defIt.next());
+        }
+      }
       fu = Shell::Flattening::flatten(fu);
       fu = Shell::Skolem::skolemise(fu);
 
@@ -135,10 +175,11 @@ void Preprocessor::preprocess(Problem &prb)
   }
 
   if (!valid) {
-    FO2Logger::logDebug("FO2Preprocessor: Some pre-saturation clauses contain components to be split via Splitting.");
+    FO2Logger::logDebug("FO2Preprocessor: Some pre-saturation clauses contain components that violate S2 constraints.");
   }
 
   FO2Logger::logLemma("PROBLEM AFTER PREPROCESSING", prb);
   FO2Logger::logPhase("FO2 Preprocessing completed");
+  return valid;
 }
 } // namespace FO2Preprocessor

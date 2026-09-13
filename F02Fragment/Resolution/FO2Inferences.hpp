@@ -37,6 +37,13 @@ public:
    * Returns true if split succeeded, populating outR1 and outR2.
    */
   static bool split(const IndexedClause& icl, IndexedClause& outR1, IndexedClause& outR2);
+
+  /**
+   * @brief Performs Equality Resolution and simplification on an indexed clause.
+   * Eliminates negative equality literals (t1 != t2) when t1 and t2 unify.
+   * Returns true if simplified successfully, setting outIsTautology to true if clause is a tautology (x = x).
+   */
+  static bool simplifyEqualityClause(const IndexedClause& inIcl, IndexedClause& outIcl, bool& outIsTautology);
 };
 
 } // namespace FO2Fragment

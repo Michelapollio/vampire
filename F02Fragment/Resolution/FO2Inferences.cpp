@@ -79,7 +79,8 @@ bool FO2Inferences::factor(const IndexedClause& icl, size_t litIdx1, size_t litI
   Literal* lit2 = icl[litIdx2].literal;
   if (!lit1 || !lit2) return false;
 
-  // Factoring requires same polarity
+  // Factoring requires same polarity and same index
+  if (icl[litIdx1].index != icl[litIdx2].index) return false;
   if (lit1->polarity() != lit2->polarity()) return false;
 
   Literal* posLit1 = Literal::create(lit1, true);
@@ -106,31 +107,45 @@ bool FO2Inferences::factor(const IndexedClause& icl, size_t litIdx1, size_t litI
   return true;
 }
 
+namespace {
+static bool matchSubsumptionLiterals(size_t litIdx1, const IndexedClause& icl1, const IndexedClause& icl2, RobSubstitution& subst) {
+  if (litIdx1 >= icl1.length()) {
+    return true;
+  }
+
+  const IndexedLiteral& ilit1 = icl1[litIdx1];
+  for (size_t j = 0; j < icl2.length(); ++j) {
+    const IndexedLiteral& ilit2 = icl2[j];
+    if (ilit1.index != ilit2.index) continue;
+    if (ilit1.literal->polarity() != ilit2.literal->polarity()) continue;
+    if (ilit1.literal->functor() != ilit2.literal->functor()) continue;
+
+    BacktrackData bd;
+    subst.bdRecord(bd);
+
+    Literal* pos1 = Literal::create(ilit1.literal, true);
+    Literal* pos2 = Literal::create(ilit2.literal, true);
+    if (subst.match(TermList(pos1), 0, TermList(pos2), 1)) {
+      if (matchSubsumptionLiterals(litIdx1 + 1, icl1, icl2, subst)) {
+        subst.bdDone();
+        bd.drop();
+        return true;
+      }
+    }
+    subst.bdDone();
+    bd.backtrack();
+  }
+  return false;
+}
+} // namespace
+
 bool FO2Inferences::subsumes(const IndexedClause& icl1, const IndexedClause& icl2)
 {
   if (icl1.length() > icl2.length()) return false;
   if (icl1.length() == 0) return true;
 
-  // Check matching by building a RobSubstitution for each pairing
-  for (size_t i = 0; i < icl1.length(); ++i) {
-    bool foundMatch = false;
-    for (size_t j = 0; j < icl2.length(); ++j) {
-      if (icl1[i].index != icl2[j].index) continue;
-      if (icl1[i].literal->polarity() != icl2[j].literal->polarity()) continue;
-      if (icl1[i].literal->functor() != icl2[j].literal->functor()) continue;
-
-      RobSubstitution subst;
-      Literal* pos1 = Literal::create(icl1[i].literal, true);
-      Literal* pos2 = Literal::create(icl2[j].literal, true);
-      if (subst.unify(TermList(pos1), 0, TermList(pos2), 1)) {
-        foundMatch = true;
-        break;
-      }
-    }
-    if (!foundMatch) return false;
-  }
-
-  return true;
+  RobSubstitution subst;
+  return matchSubsumptionLiterals(0, icl1, icl2, subst);
 }
 
 bool FO2Inferences::split(const IndexedClause& icl, IndexedClause& outR1, IndexedClause& outR2)
@@ -197,6 +212,77 @@ bool FO2Inferences::split(const IndexedClause& icl, IndexedClause& outR1, Indexe
 
   outR1 = IndexedClause(r1Lits);
   outR2 = IndexedClause(r2Lits);
+  return true;
+}
+
+bool FO2Inferences::simplifyEqualityClause(const IndexedClause& inIcl, IndexedClause& outIcl, bool& outIsTautology)
+{
+  outIsTautology = false;
+  std::vector<IndexedLiteral> currentLits = inIcl.literals();
+  bool modified = true;
+
+  while (modified) {
+    modified = false;
+
+    // 1. Check for tautology x = x (positive equality reflexivity)
+    for (size_t i = 0; i < currentLits.size(); ++i) {
+      Literal* lit = currentLits[i].literal;
+      if (lit && lit->isEquality()) {
+        TermList t1 = *lit->nthArgument(0);
+        TermList t2 = *lit->nthArgument(1);
+        if (lit->isPositive()) {
+          if (t1.sameContent(&t2)) {
+            outIsTautology = true;
+            outIcl = IndexedClause();
+            return true;
+          }
+        }
+      }
+    }
+
+    // 2. Perform Equality Resolution on negative equality literals (t1 != t2)
+    for (size_t i = 0; i < currentLits.size(); ++i) {
+      Literal* lit = currentLits[i].literal;
+      if (lit && lit->isEquality() && !lit->isPositive()) {
+        TermList t1 = *lit->nthArgument(0);
+        TermList t2 = *lit->nthArgument(1);
+
+        RobSubstitution subst;
+        if (subst.unify(t1, 0, t2, 0)) {
+          std::vector<IndexedLiteral> newLits;
+          for (size_t j = 0; j < currentLits.size(); ++j) {
+            if (i == j) continue;
+            Literal* origLit = currentLits[j].literal;
+            Literal* newLit = subst.apply(origLit, 0);
+            newLits.push_back(IndexedLiteral(newLit, currentLits[j].index));
+          }
+          currentLits = newLits;
+          modified = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // 3. Convert any remaining equality literals to eq0/neq0 predicates
+  static unsigned eq0Functor = env.signature->addPredicate("eq0", 2);
+  static unsigned neq0Functor = env.signature->addPredicate("neq0", 2);
+
+  for (size_t i = 0; i < currentLits.size(); ++i) {
+    Literal* lit = currentLits[i].literal;
+    if (lit && lit->isEquality()) {
+      TermList args[2] = {*lit->nthArgument(0), *lit->nthArgument(1)};
+      Literal* proxyLit = nullptr;
+      if (lit->isPositive()) {
+        proxyLit = Literal::create(eq0Functor, 2, true, args);
+      } else {
+        proxyLit = Literal::create(neq0Functor, 2, true, args);
+      }
+      currentLits[i] = IndexedLiteral(proxyLit, currentLits[i].index);
+    }
+  }
+
+  outIcl = IndexedClause(currentLits);
   return true;
 }
 
