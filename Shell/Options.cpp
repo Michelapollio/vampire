@@ -126,6 +126,7 @@ void Options::init()
                                       "model_check",
                                       "fo2",
                                       "fo2_classifier",
+                                      "fo2_remove_equality",
                                       "output",
                                         "portfolio",
                                         "preprocess",
@@ -146,6 +147,7 @@ void Options::init()
     "  -tpreprocess,tclausify: output modes for theory input (clauses are quantified\n      with sort information).\n"
     "  -output,profile: output information about the problem\n"
     "  -fo2: check whether input problems belong to the FO2 fragment (first-order two-variable fragment)\n"
+    "  -fo2_remove_equality / -remove_equality: apply remove equality to FO2 problems and output the problem without equality\n"
     "Some modes are not currently maintained (get in touch if interested):\n"
     "  -bpa: perform bound propagation\n"
     "  -consequence_elimination: perform consequence elimination\n";

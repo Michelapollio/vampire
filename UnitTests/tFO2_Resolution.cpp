@@ -3,6 +3,9 @@
  * Vampire. It is protected by applicable copyright laws.
  */
 
+#include <cstdlib>
+#include <iostream>
+
 #include "Debug/Assertion.hpp"
 #include "Test/UnitTesting.hpp"
 #include "Test/SyntaxSugar.hpp"
@@ -31,6 +34,16 @@ Clause* createClause(std::initializer_list<Literal*> lits)
 }
 
 } // namespace
+
+// Always-active check (ASS is compiled out in Release builds)
+#define FO2_CHECK(cond)                                                     \
+  do {                                                                      \
+    if (!(cond)) {                                                          \
+      std::cerr << "FO2_CHECK failed: " #cond " (line " << __LINE__ << ")" \
+                << std::endl;                                               \
+      std::exit(1);                                                         \
+    }                                                                       \
+  } while (0)
 
 TEST_FUN(test_fo2_indexed_clause_and_sigma2_selection)
 {
@@ -134,6 +147,37 @@ TEST_FUN(test_fo2_inference_subsumption)
 
   bool isSubsumed = FO2Inferences::subsumes(iclSub, iclTarget);
   ASS(isSubsumed);
+}
+
+TEST_FUN(test_fo2_inference_subsumption_consistent_substitution)
+{
+  TermList x = TermList::var(0);
+
+  unsigned pFunctor = env.signature->addFreshPredicate(1, "P");
+  unsigned qFunctor = env.signature->addFreshPredicate(1, "Q");
+  TermList a(Term::createConstant(env.signature->addFreshFunction(0, "a")));
+  TermList b(Term::createConstant(env.signature->addFreshFunction(0, "b")));
+
+  // Subsuming clause: P(x) \lor Q(x)
+  IndexedClause iclSub = IndexedClause::fromClause(
+      createClause({Literal::create1(pFunctor, true, x), Literal::create1(qFunctor, true, x)}));
+
+  // P(a) \lor Q(b): would need x -> a and x -> b simultaneously, so NOT subsumed
+  IndexedClause iclDiff = IndexedClause::fromClause(
+      createClause({Literal::create1(pFunctor, true, a), Literal::create1(qFunctor, true, b)}));
+  FO2_CHECK(!FO2Inferences::subsumes(iclSub, iclDiff));
+
+  // P(a) \lor Q(a): x -> a works for both literals, so subsumed
+  IndexedClause iclSame = IndexedClause::fromClause(
+      createClause({Literal::create1(pFunctor, true, a), Literal::create1(qFunctor, true, a)}));
+  FO2_CHECK(FO2Inferences::subsumes(iclSub, iclSame));
+
+  // P(a) \lor P(b) \lor Q(b): the first attempt x -> a fails on Q, backtracking
+  // must retry with x -> b
+  IndexedClause iclBacktrack = IndexedClause::fromClause(
+      createClause({Literal::create1(pFunctor, true, a), Literal::create1(pFunctor, true, b),
+                    Literal::create1(qFunctor, true, b)}));
+  FO2_CHECK(FO2Inferences::subsumes(iclSub, iclBacktrack));
 }
 
 TEST_FUN(test_fo2_inference_split)

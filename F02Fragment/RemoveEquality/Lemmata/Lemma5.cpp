@@ -8,8 +8,9 @@
 #include "Kernel/Term.hpp"
 #include "Kernel/TermIterators.hpp"
 #include "Kernel/Unit.hpp"
-#include "Kernel/SortHelper.hpp"
 #include "Kernel/Inference.hpp"
+#include "Kernel/Signature.hpp"
+#include "Lib/Environment.hpp"
 #include "Lib/Stack.hpp"
 #include "F02Fragment/FO2Logger.hpp"
 
@@ -216,6 +217,13 @@ void Lemma5::applyLemma5(Kernel::Problem &prb)
 
       Kernel::Formula* gammaX = createDisjunctionFromLiterals(gammaLits);
       Kernel::Formula* deltaX = createDisjunctionFromLiterals(deltaLits);
+      (void)deltaX;
+
+      std::vector<Kernel::Literal*> deltaLitsX;
+      for (Kernel::Literal* lit : deltaLits) {
+        deltaLitsX.push_back(renameVarYtoX(lit));
+      }
+      Kernel::Formula* deltaX0 = createDisjunctionFromLiterals(deltaLitsX);
 
       std::vector<Kernel::Literal*> gammaLitsY;
       for (Kernel::Literal* lit : gammaLits) {
@@ -234,7 +242,7 @@ void Lemma5::applyLemma5(Kernel::Problem &prb)
       Kernel::Formula* gammaY = createDisjunctionFromLiterals(gammaLitsY);
 
       Kernel::Formula* ramo1 = new Kernel::QuantifiedFormula(Kernel::FORALL, Kernel::VSList::singleton({0u, sort}), gammaX);
-      Kernel::Formula* ramo2 = new Kernel::QuantifiedFormula(Kernel::FORALL, Kernel::VSList::singleton({0u, sort}), deltaX);
+      Kernel::Formula* ramo2 = new Kernel::QuantifiedFormula(Kernel::FORALL, Kernel::VSList::singleton({0u, sort}), deltaX0);
 
       Kernel::Formula* notGammaX = new Kernel::NegatedFormula(gammaX);
       Kernel::Formula* notGammaY = new Kernel::NegatedFormula(gammaY);
@@ -250,7 +258,7 @@ void Lemma5::applyLemma5(Kernel::Problem &prb)
       Kernel::Formula* existsUnique = new Kernel::QuantifiedFormula(Kernel::EXISTS, Kernel::VSList::singleton({0u, sort}), existsUniqueBody);
 
       Kernel::Formula* coimp = new Kernel::QuantifiedFormula(Kernel::FORALL, Kernel::VSList::singleton({0u, sort}),
-                                                             new Kernel::BinaryFormula(Kernel::IFF, gammaX, deltaX));
+                                                             new Kernel::BinaryFormula(Kernel::IFF, gammaX, deltaX0));
 
       Kernel::FormulaList* andArgs2 = Kernel::FormulaList::empty();
       Kernel::FormulaList::push(coimp, andArgs2);
@@ -261,7 +269,8 @@ void Lemma5::applyLemma5(Kernel::Problem &prb)
       Kernel::FormulaList::push(ramo3, branches);
       Kernel::FormulaList::push(ramo2, branches);
       Kernel::FormulaList::push(ramo1, branches);
-      Kernel::Unit* newUnit = new Kernel::FormulaUnit(ramo1, Kernel::Inference(Kernel::FromInput(Kernel::UnitInputType::AXIOM)));
+      Kernel::Formula* finalFormula = Kernel::JunctionFormula::generalJunction(Kernel::OR, branches);
+      Kernel::Unit* newUnit = new Kernel::FormulaUnit(finalFormula, Kernel::Inference(Kernel::FromInput(Kernel::UnitInputType::AXIOM)));
       Kernel::UnitList::push(newUnit, newUnits);
       continue;
     }

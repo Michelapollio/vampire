@@ -72,7 +72,8 @@ struct Lemma3State {
 
   unsigned getNeqPredicate() {
     if (neqPredicate == 0) {
-      neqPredicate = env.signature->addFreshPredicate(2, "neq");
+      bool added = false;
+      neqPredicate = env.signature->addPredicate("neq", 2, added);
       requiresNeqAxiom = true;
     }
     return neqPredicate;
@@ -189,7 +190,7 @@ Formula *replaceEqualityInFormula(Formula *formula, Lemma3State &state)
  */
 void Lemma3::applyLemma3(Kernel::Problem &prb)
 {
-  FO2Logger::logDebug("[Lemma 3] INIZIO APPLICAZIONE LEMMA 3");
+//  FO2Logger::logDebug("[Lemma 3] INIZIO APPLICAZIONE LEMMA 3");
 
   Lemma3State state;
 
@@ -210,14 +211,34 @@ void Lemma3::applyLemma3(Kernel::Problem &prb)
   }
 
   if (state.requiresNeqAxiom) {
-    Formula *axiomFormula = createNeqReflexivityAxiom(state.getNeqPredicate());
+    unsigned neqPred = state.getNeqPredicate();
+    Formula *axiomFormula = createNeqReflexivityAxiom(neqPred);
     Unit *axiomUnit = new FormulaUnit(axiomFormula, Inference(FromInput(UnitInputType::AXIOM)));
 
     UnitList *axiomWrapper = UnitList::empty();
     UnitList::push(axiomUnit, axiomWrapper);
+
+    // Inject Leibniz congruence axioms for unary predicates: ~P(X0) | P(X1) | neq(X0, X1)
+    unsigned predsCount = env.signature->predicates();
+    for (unsigned p = 1; p < predsCount; p++) {
+      if (p == neqPred) continue;
+      Signature::Symbol* sym = env.signature->getPredicate(p);
+      if (sym && sym->arity() == 1) {
+        TermList varX = TermList::var(0);
+        TermList varY = TermList::var(1);
+        Lib::Stack<Literal*> lits;
+        lits.push(Literal::create1(p, false, varX));
+        lits.push(Literal::create1(p, true, varY));
+        TermList neqArgs[2] = {varX, varY};
+        lits.push(Literal::create(neqPred, 2, true, neqArgs));
+        Clause* congCl = Clause::fromStack(lits, Inference(FromInput(UnitInputType::AXIOM)));
+        UnitList::push(congCl, axiomWrapper);
+      }
+    }
+
     prb.units() = UnitList::concat(axiomWrapper, prb.units());
 
-    FO2Logger::logDebug("[Lemma 3] Iniettato assioma di anti-riflessivita' per neq: " + axiomFormula->toString());
+    FO2Logger::logDebug("[Lemma 3] Iniettati assiomi di congruenza per neq.");
   }
 
   FO2Logger::logDebug("[Lemma 3] FINE LEMMA 3");

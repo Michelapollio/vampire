@@ -65,16 +65,39 @@ int compareGroundIndexedLiterals(const IndexedLiteral& ilitA, const IndexedLiter
   if (depthA < depthB) return -1;
   if (depthA > depthB) return 1;
 
-  if (ilitA.index < ilitB.index) return -1;
-  if (ilitA.index > ilitB.index) return 1;
-
   return 0;
 }
 
 IndexedClause::IndexedClause() : _originClause(nullptr) {}
 
 IndexedClause::IndexedClause(const std::vector<IndexedLiteral>& lits, Kernel::Clause* origin)
-    : _literals(lits), _originClause(origin) {}
+    : _literals(lits), _originClause(origin)
+{
+  DHSet<unsigned> clauseVars;
+  for (const auto& ilit : _literals) {
+    if (ilit.literal) {
+      VariableIterator vit(ilit.literal);
+      while (vit.hasNext()) {
+        clauseVars.insert(vit.next().var());
+      }
+    }
+  }
+
+  const unsigned numClauseVars = clauseVars.size();
+  for (auto& ilit : _literals) {
+    if (!ilit.literal) continue;
+    DHSet<unsigned> litVars;
+    VariableIterator lvit(ilit.literal);
+    while (lvit.hasNext()) {
+      litVars.insert(lvit.next().var());
+    }
+    if (numClauseVars == 2 && litVars.size() == 2) {
+      ilit.index = 1;
+    } else {
+      ilit.index = 0;
+    }
+  }
+}
 
 unsigned IndexedClause::varCount() const
 {
@@ -117,6 +140,50 @@ std::string IndexedClause::toString() const
 
 bool IndexedClause::isSelected(size_t litIndex) const
 {
+  if (litIndex >= _literals.size()) return false;
+  
+  // Lemma 9 says "pick a literal L". To maintain completeness (preventing Satisfiable when actually Unsatisfiable)
+  // while avoiding exponential explosion, we must select EXACTLY ONE valid literal using a STRICT GLOBAL ORDERING.
+  size_t best_idx = _literals.size();
+  for (size_t i = 0; i < _literals.size(); ++i) {
+    if (isValidSelectionCandidate(i)) {
+      if (best_idx == _literals.size()) {
+        best_idx = i;
+      } else {
+        const IndexedLiteral& A = _literals[i];
+        const IndexedLiteral& B = _literals[best_idx];
+        
+        unsigned depthA = getLiteralDepth(A.literal);
+        unsigned depthB = getLiteralDepth(B.literal);
+        
+        bool is_greater = false;
+        if (depthA > depthB) {
+            is_greater = true;
+        } else if (depthA == depthB) {
+            if (A.index > B.index) {
+                is_greater = true;
+            } else if (A.index == B.index) {
+                if (A.literal->functor() > B.literal->functor()) {
+                    is_greater = true;
+                } else if (A.literal->functor() == B.literal->functor()) {
+                    if (A.literal->polarity() > B.literal->polarity()) {
+                        is_greater = true;
+                    }
+                }
+            }
+        }
+        
+        if (is_greater) {
+            best_idx = i;
+        }
+      }
+    }
+  }
+  return litIndex == best_idx;
+}
+
+bool IndexedClause::isValidSelectionCandidate(size_t litIndex) const
+{
   if (litIndex >= _literals.size()) {
     return false;
   }
@@ -136,6 +203,32 @@ bool IndexedClause::isSelected(size_t litIndex) const
   const IndexedLiteral& target = _literals[litIndex];
   const bool targetHasFunc = hasFunctionalTerms(target.literal);
 
+  // Lemma 9 requirement: Each literal selected by Σ2 contains all variables of its clause.
+  DHSet<unsigned> clauseVars;
+  for (const auto& ilit : _literals) {
+    if (ilit.literal) {
+      VariableIterator vit(ilit.literal);
+      while (vit.hasNext()) {
+        clauseVars.insert(vit.next().var());
+      }
+    }
+  }
+  
+  DHSet<unsigned> targetVars;
+  if (target.literal) {
+    VariableIterator vit(target.literal);
+    while (vit.hasNext()) {
+      targetVars.insert(vit.next().var());
+    }
+  }
+  
+  DHSet<unsigned>::Iterator cit(clauseVars);
+  while (cit.hasNext()) {
+    if (!targetVars.contains(cit.next())) {
+      return false; // Does not contain all variables of the clause
+    }
+  }
+
   // Condition 1: A has no functional terms, a = 0, and there is a literal B:b in c with b = 1.
   if (!targetHasFunc && target.index == 0 && clauseHasIndexOne) {
     return false;
@@ -146,6 +239,8 @@ bool IndexedClause::isSelected(size_t litIndex) const
     return false;
   }
 
+  // Fallback if no literal could be selected because of these rules?
+  // Lemma 9 guarantees at least one literal is selectable for S2 clauses.
   return true;
 }
 

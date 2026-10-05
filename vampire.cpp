@@ -462,14 +462,13 @@ void fo2Mode(Problem* problem)
 {
   ScopedPtr<Problem> prb(problem);
 
-  FO2Fragment::FO2Logger::setVerbosity(FO2Fragment::VerbosityLevel::QUIET);
+  FO2Fragment::FO2Logger::setVerbosity(FO2Fragment::VerbosityLevel::DEBUG);
 
   bool hasEq = false;
   bool isFO2 = FO2Fragment::Classifier::isFO2(prb->units(), hasEq);
 
   if (!isFO2) {
-    std::cout << "[FO2] Errore: Il problema NON appartiene al frammento FO2 (più di 2 variabili libere o quantificate).\n";
-    vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
+    vampireMode(prb.release());
     return;
   }
 
@@ -484,8 +483,10 @@ void fo2Mode(Problem* problem)
   bool isS2Valid = FO2Preprocessor::Preprocessor::preprocess(*prb);
 
   if (!isS2Valid) {
-    FO2Fragment::FO2Logger::logPhase("FO2 Preprocessor: S2 invariant violation detected. Safe fallback to Vampire Standard Mode.");
-    vampireMode(prb.release());
+    FO2Fragment::FO2Logger::logPhase("FO2 Preprocessor: S2 invariant violation detected. Returning Unknown.");
+    env.statistics->terminationReason = TerminationReason::UNKNOWN;
+    std::cout << "% SZS status Unknown for " << env.options->problemName() << std::endl;
+    vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
     return;
   }
 
@@ -498,6 +499,12 @@ void fo2Mode(Problem* problem)
   } else if (res == FO2Fragment::FO2Result::UNSATISFIABLE) {
     env.statistics->terminationReason = TerminationReason::REFUTATION;
     std::cout << "% SZS status Unsatisfiable for " << env.options->problemName() << std::endl;
+  } else if (res == FO2Fragment::FO2Result::UNKNOWN) {
+    FO2Fragment::FO2Logger::logPhase("FO2Solver returned UNKNOWN. Returning Unknown.");
+    env.statistics->terminationReason = TerminationReason::UNKNOWN;
+    std::cout << "% SZS status Unknown for " << env.options->problemName() << std::endl;
+    vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
+    return;
   }
 
   if (env.statistics->refutation) {
@@ -506,6 +513,7 @@ void fo2Mode(Problem* problem)
 
   vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
 }
+
 
 void fo2ClassifierMode(Problem* problem)
 {
@@ -526,6 +534,29 @@ void fo2ClassifierMode(Problem* problem)
   }
 
   vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
+}
+
+void fo2RemoveEqualityMode(Problem* problem)
+{
+  ScopedPtr<Problem> prb(problem);
+
+  FO2Fragment::FO2Logger::setVerbosity(FO2Fragment::VerbosityLevel::QUIET);
+
+  bool hasEq = false;
+  bool isFO2 = FO2Fragment::Classifier::isFO2(prb->units(), hasEq);
+
+  if (!isFO2) {
+    vampireMode(prb.release());
+    return;
+  }
+
+  if (!hasEq && !prb->hasEquality()) {
+    std::cout << "% [FO2] Il problema appartiene al frammento FO2 e NON contiene uguaglianze. I lemmata vengono saltati.\n";
+  } else {
+    FO2Fragment::RemoveEquality::removeEquality(*prb);
+  }
+
+  vampireMode(prb.release());
 }
 
 void dispatchByMode(Problem* problem)
@@ -631,6 +662,9 @@ void dispatchByMode(Problem* problem)
     break;
   case Options::Mode::FO2_CLASSIFIER:
     fo2ClassifierMode(problem);
+    break;
+  case Options::Mode::FO2_REMOVE_EQUALITY:
+    fo2RemoveEqualityMode(problem);
     break;
   }
 }

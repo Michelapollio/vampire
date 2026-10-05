@@ -69,6 +69,7 @@ public:
    * Returns true if literal at position litIndex is selected in this clause.
    */
   bool isSelected(size_t litIndex) const;
+  bool isValidSelectionCandidate(size_t litIndex) const;
 
   /**
    * @brief Returns indices of all selected literals in this clause according to \Sigma_2.

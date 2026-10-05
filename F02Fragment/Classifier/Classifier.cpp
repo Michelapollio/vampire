@@ -82,7 +82,11 @@ bool FO2Fragment::Classifier::isFO2(UnitList *ul, bool &hasEq) {
         case LITERAL: {
             const Literal* lit = f->literal();
             if (!lit) return false;
-            if (lit->isEquality()) hasEq = true;
+            if (lit->isEquality()) {
+                hasEq = true;
+            } else if (lit->arity() > 2) {
+                return false;
+            }
             for (unsigned i = 0; i < (unsigned)lit->arity(); ++i) {
                 const TermList* tl = lit->nthArgument(i);
                 if (!tl) return false;
@@ -116,13 +120,14 @@ bool FO2Fragment::Classifier::isFO2(UnitList *ul, bool &hasEq) {
  * @return true if the clause is in the FO2 fragment, false otherwise
  */
     bool FO2Fragment::Classifier::isFO2Clause(Clause* clause, DHSet<unsigned> &vars, bool &hasEq) {
-
+     vars.reset();
      for (unsigned i = 0; i < clause->length(); ++i) {
-        vars.reset();
         const Literal* lit = (*clause)[i];
         if (!lit) return false;
         if (lit->isEquality()) {
             hasEq = true;
+        } else if (lit->arity() > 2) {
+            return false;
         }
         for (unsigned a = 0; a < (unsigned)lit->arity(); ++a) {
             const TermList* tl = lit->nthArgument(a);

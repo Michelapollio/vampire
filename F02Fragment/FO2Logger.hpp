@@ -63,7 +63,11 @@ class FO2Logger {
                 size_t count = 0;
                 while (it.hasNext()) {
                     Kernel::Unit* u = it.next();
-                    std::cout << "  [" << ++count << "] " << u->toString() << "\n";
+                    if (u->isClause()) {
+                        std::cout << "  [" << ++count << "] " << static_cast<Kernel::Clause*>(u)->toNiceString() << "\n";
+                    } else {
+                        std::cout << "  [" << ++count << "] " << u->toString() << "\n";
+                    }
                 }
                 if (count == 0) {
                     std::cout << "  (No units present in the problem)\n";
@@ -72,8 +76,9 @@ class FO2Logger {
             }
         }
 
-        // Always logs problem units state regardless of verbosity level
+        // Always logs problem units state unless quiet
         static void logAlways(const std::string& title, Kernel::Problem &prb){
+            if (isQuiet()) return;
             std::cout << "\n==================================================\n";
             std::cout << "[FO2][FINAL OUTPUT] " << title << "\n";
             std::cout << "==================================================\n";
@@ -82,7 +87,11 @@ class FO2Logger {
             size_t count = 0;
             while (it.hasNext()) {
                 Kernel::Unit* u = it.next();
-                std::cout << "  [" << ++count << "] " << u->toString() << "\n";
+                if (u->isClause()) {
+                    std::cout << "  [" << ++count << "] " << static_cast<Kernel::Clause*>(u)->toNiceString() << "\n";
+                } else {
+                    std::cout << "  [" << ++count << "] " << u->toString() << "\n";
+                }
             }
             if (count == 0) {
                 std::cout << "  (No units present in the problem)\n";
