@@ -1,8 +1,3 @@
-/*
- * This file is part of the source code of the software program
- * Vampire. It is protected by applicable copyright laws.
- */
-
 #include "Debug/Assertion.hpp"
 #include "Test/UnitTesting.hpp"
 #include "Test/SyntaxSugar.hpp"

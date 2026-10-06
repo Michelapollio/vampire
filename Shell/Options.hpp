@@ -380,6 +380,8 @@ public:
     /** Check whether input problems belong to the FO2 fragment */
     FO2,
     FO2_CLASSIFIER,
+    FO2_REMOVE_EQUALITY,
+    FO2_STEP_BY_STEP,
     /** this mode only outputs the input problem, without any preprocessing */
     OUTPUT,
     PORTFOLIO,
@@ -1051,7 +1053,11 @@ private:
         
         bool setValue(const std::string& value) override{
             // makes reasonable assumption about ordering of every enum
-            int index = choices.find(value.c_str());
+            std::string val = value;
+            if (val == "remove_equality") {
+                val = "fo2_remove_equality";
+            }
+            int index = choices.find(val.c_str());
             if(index<0) return false;
             this->actualValue = static_cast<T>(index);
             return true;

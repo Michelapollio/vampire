@@ -7,6 +7,7 @@
 #include "Kernel/Term.hpp"
 #include "Kernel/Unit.hpp"
 #include "Kernel/SortHelper.hpp"
+#include "Kernel/Inference.hpp"
 
 #include "Lib/DHMap.hpp"
 #include "Lib/Stack.hpp"
@@ -22,52 +23,59 @@ namespace FO2Fragment {
 
 namespace {
 
-void getFreeVars(Formula *formula, bool &hasX, bool &hasY)
+void collectFreeVars(const Formula *formula, Kernel::DHSet<unsigned> &freeVars)
 {
   if (!formula)
     return;
 
   switch (formula->connective()) {
     case LITERAL: {
-      Literal *lit = formula->literal();
+      const Literal *lit = formula->literal();
       unsigned ar = lit->arity();
       for (unsigned i = 0; i < ar; ++i) {
         TermList arg = *lit->nthArgument(i);
         if (arg.isVar()) {
-          if (arg.var() == 0)
-            hasX = true;
-          if (arg.var() == 1)
-            hasY = true;
+          freeVars.insert(arg.var());
         }
       }
       break;
     }
 
     case NOT:
-      getFreeVars(formula->uarg(), hasX, hasY);
+      collectFreeVars(formula->uarg(), freeVars);
       break;
 
     case IMP:
     case IFF:
     case XOR:
-      getFreeVars(formula->left(), hasX, hasY);
-      getFreeVars(formula->right(), hasX, hasY);
+      collectFreeVars(formula->left(), freeVars);
+      collectFreeVars(formula->right(), freeVars);
       break;
 
     case AND:
     case OR: {
       FormulaList::Iterator it(formula->args());
       while (it.hasNext()) {
-        getFreeVars(it.next(), hasX, hasY);
+        collectFreeVars(it.next(), freeVars);
       }
       break;
     }
 
     case FORALL:
     case EXISTS: {
-      bool subX = false;
-      bool subY = false; 
-      getFreeVars(formula->qarg(), subX, subY);
+      Kernel::DHSet<unsigned> subVars;
+      collectFreeVars(formula->qarg(), subVars);
+
+      Kernel::VSList::Iterator vit(formula->vars());
+      while (vit.hasNext()) {
+        unsigned bVar = vit.next().first; 
+        subVars.remove(bVar);
+      }
+
+      Kernel::DHSet<unsigned>::Iterator sit(subVars);
+      while (sit.hasNext()) {
+        freeVars.insert(sit.next());
+      }
       break;
     }
 
@@ -76,7 +84,7 @@ void getFreeVars(Formula *formula, bool &hasX, bool &hasY)
   }
 }
 
-Formula *renameFormula(Formula *formula, Stack<Formula *> &newDefinitions)
+Formula *renameFormula(Formula *formula, Stack<Formula *> &newDefinitions, bool isNegated = false)
 {
   if (!formula)
     return nullptr;
@@ -86,19 +94,26 @@ Formula *renameFormula(Formula *formula, Stack<Formula *> &newDefinitions)
       return formula;
 
     case NOT: {
-      Formula *newArg = renameFormula(formula->uarg(), newDefinitions);
+      Formula *newArg = renameFormula(formula->uarg(), newDefinitions, !isNegated);
       if (newArg != formula->uarg()) {
         return new NegatedFormula(newArg);
       }
-
       return formula;
     }
 
-    case IMP:
+    case IMP: {
+      Formula *newLeft = renameFormula(formula->left(), newDefinitions, !isNegated);
+      Formula *newRight = renameFormula(formula->right(), newDefinitions, isNegated);
+      if (newLeft != formula->left() || newRight != formula->right()) {
+        return new BinaryFormula(formula->connective(), newLeft, newRight);
+      }
+      return formula;
+    }
+
     case IFF:
     case XOR: {
-      Formula *newLeft = renameFormula(formula->left(), newDefinitions);
-      Formula *newRight = renameFormula(formula->right(), newDefinitions);
+      Formula *newLeft = renameFormula(formula->left(), newDefinitions, false);
+      Formula *newRight = renameFormula(formula->right(), newDefinitions, false);
       if (newLeft != formula->left() || newRight != formula->right()) {
         return new BinaryFormula(formula->connective(), newLeft, newRight);
       }
@@ -114,7 +129,7 @@ Formula *renameFormula(Formula *formula, Stack<Formula *> &newDefinitions)
       FormulaList::Iterator it(args);
       while (it.hasNext()) {
         Formula *arg = it.next();
-        Formula *newArg = renameFormula(arg, newDefinitions);
+        Formula *newArg = renameFormula(arg, newDefinitions, isNegated);
         if (newArg != arg)
           changed = true;
         FormulaList::push(newArg, newArgs);
@@ -131,50 +146,71 @@ Formula *renameFormula(Formula *formula, Stack<Formula *> &newDefinitions)
 
     case FORALL:
     case EXISTS: {
-      Formula *processedSubf = renameFormula(formula->qarg(), newDefinitions);
+      Formula *processedSubf = renameFormula(formula->qarg(), newDefinitions, isNegated);
 
-      bool hasX = false;
-      bool hasY = false;
-      getFreeVars(processedSubf, hasX, hasY);
+      if (formula->connective() == EXISTS && processedSubf->connective() != LITERAL && !isNegated) {
+        if (processedSubf->connective() == AND) {
+          bool containsForall = false;
+          FormulaList::Iterator it(processedSubf->args());
+          while (it.hasNext()) {
+            if (it.next()->connective() == FORALL) {
+              containsForall = true;
+              break;
+            }
+          }
+          if (containsForall) {
+            if (processedSubf != formula->qarg()) {
+              return new QuantifiedFormula(formula->connective(), formula->vars(), processedSubf);
+            }
+            return formula;
+          }
+        }
 
-      if (formula->connective() == EXISTS && processedSubf->connective() != LITERAL) {
-        FO2Logger::logDebug("[Lemma 2] sottoformula complessa : " + processedSubf->toString());
+        Kernel::DHSet<unsigned> freeVars;
+        collectFreeVars(processedSubf, freeVars);
 
-        unsigned arity = 0;
-        if (hasX) arity++;
-        if (hasY) arity++;
+        Kernel::VSList::Iterator vit(formula->vars());
+        while (vit.hasNext()) {
+          unsigned bVar = vit.next().first;
+          freeVars.remove(bVar);
+        }
+
+        unsigned arity = freeVars.size();
+
+        if (arity > 1) {
+          if (processedSubf != formula->qarg()) {
+            return new QuantifiedFormula(formula->connective(), formula->vars(), processedSubf);
+          }
+          return formula;
+        }
 
         unsigned newPred = env.signature->addFreshPredicate(arity, "p_def");
         const TermList sort = AtomicSort::defaultSort();
 
         Literal *newLit = nullptr;
         if (arity == 1) {
-          TermList var = hasX ? TermList::var(0) : TermList::var(1);
-          newLit = Literal::create1(newPred, true, var);
-        } else if (arity == 2) {
-          TermList args[2] = {TermList::var(0), TermList::var(1)};
-          newLit = Literal::create(newPred, arity, true, args);
+          Kernel::DHSet<unsigned>::Iterator it(freeVars);
+          it.hasNext(); // CRUCIAL: MUST BE CALLED BEFORE next() IN VAMPIRE
+          unsigned varIdx = it.next();
+          newLit = Literal::create1(newPred, true, TermList::var(varIdx));
         } else {
           newLit = Literal::create(newPred, true, {});
         }
 
-        // Construct definition formula: \forall [vars]. (p_def(vars) <=> subformula)
         Formula* defAtom = new AtomicFormula(newLit);
-        Formula* biconditional = new BinaryFormula(IFF, defAtom, processedSubf);
+        Formula* biconditional = new BinaryFormula(IFF, defAtom, new QuantifiedFormula(formula->connective(), formula->vars(), processedSubf));
 
         Formula* defFormula = biconditional;
-        if (hasY) {
-          defFormula = new QuantifiedFormula(FORALL, VSList::singleton({1u, sort}), defFormula);
-        }
-        if (hasX) {
-          defFormula = new QuantifiedFormula(FORALL, VSList::singleton({0u, sort}), defFormula);
+        Kernel::DHSet<unsigned>::Iterator fit(freeVars);
+        while (fit.hasNext()) {
+          unsigned varIdx = fit.next();
+          defFormula = new QuantifiedFormula(FORALL, VSList::singleton({varIdx, sort}), defFormula);
         }
 
         newDefinitions.push(defFormula);
 
-        // Replace complex subformula with the new predicate atom
-        Formula *replacementAtom = new AtomicFormula(newLit);
-        return new QuantifiedFormula(formula->connective(), formula->vars(), replacementAtom);
+        // Crucial fix: return ONLY the replacement atom.
+        return defAtom;
       }
 
       if (processedSubf != formula->qarg()) {
@@ -192,19 +228,21 @@ Formula *renameFormula(Formula *formula, Stack<Formula *> &newDefinitions)
 
 void Lemma2::applyLemma2(Kernel::Problem &prb)
 {
-
-  FO2Logger::logDebug("[Lemma 2] INIZIO APPLICAZIONE LEMMA 2");
+  FO2Logger::logDebug("[Lemma 2] INIZIO LEMMA 2");
 
   Stack<Formula *> newDefinitions;
 
-  UnitList::DelIterator it(prb.units());
+  Kernel::UnitList::DelIterator it(prb.units());
   while (it.hasNext()) {
     Unit *unit = it.next();
 
-    if (!unit->isClause()) {
-      FormulaUnit *fu = static_cast<FormulaUnit *>(unit);
-      Formula *originFormula = fu->formula();
+    if (unit->isClause())
+      continue;
 
+    FormulaUnit *formulaUnit = static_cast<FormulaUnit *>(unit);
+    Formula *originFormula = formulaUnit->formula();
+
+    if (originFormula) {
       Formula *processedFormula = renameFormula(originFormula, newDefinitions);
 
       if (processedFormula != originFormula) {

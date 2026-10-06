@@ -49,3 +49,6 @@ cmake-build
 *.tgz
 tests/tptp_raw/
 
+
+# ignore build obj
+/obj/

@@ -1,0 +1,11 @@
+--- F02Fragment/Preprocessor/FO2Preprocessor.cpp
++++ F02Fragment/Preprocessor/FO2Preprocessor.cpp
+@@ -321,7 +321,7 @@
+ 
+   Stack<Clause*> normalizedClauses;
+   while (!allClauses.isEmpty()) {
+-    normalizeClauseForS2(allClauses.pop(), normalizedClauses);
++    normalizedClauses.push(allClauses.pop());
+   }
+ 
+   while (!normalizedClauses.isEmpty()) {

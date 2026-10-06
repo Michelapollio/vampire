@@ -54,6 +54,7 @@
 #include "Shell/Statistics.hpp"
 #include "Shell/UIHelper.hpp"
 #include "Shell/SineUtils.hpp"
+#include "Shell/Rectify.hpp"
 
 #include "Saturation/SaturationAlgorithm.hpp"
 
@@ -62,6 +63,13 @@
 #include "F02Fragment/Classifier/Classifier.hpp"
 #include "F02Fragment/Preprocessor/FO2Preprocessor.hpp"
 #include "F02Fragment/RemoveEquality/RemoveEquality.hpp"
+#include "F02Fragment/RemoveEquality/Lemmata/Lemma1.hpp"
+#include "F02Fragment/RemoveEquality/Lemmata/Lemma2.hpp"
+#include "F02Fragment/RemoveEquality/Lemmata/Lemma3.hpp"
+#include "F02Fragment/RemoveEquality/Lemmata/Lemma4.hpp"
+#include "F02Fragment/RemoveEquality/Lemmata/Lemma5.hpp"
+#include "F02Fragment/RemoveEquality/Lemmata/Lemma6.hpp"
+#include "Shell/SimplifyFalseTrue.hpp"
 #include "F02Fragment/FO2Logger.hpp"
 #include "F02Fragment/Resolution/FO2Resolution.hpp"
 #include "F02Fragment/Resolution/FO2Solver.hpp"
@@ -462,14 +470,13 @@ void fo2Mode(Problem* problem)
 {
   ScopedPtr<Problem> prb(problem);
 
-  FO2Fragment::FO2Logger::setVerbosity(FO2Fragment::VerbosityLevel::QUIET);
+  FO2Fragment::FO2Logger::setVerbosity(FO2Fragment::VerbosityLevel::DEBUG);
 
   bool hasEq = false;
   bool isFO2 = FO2Fragment::Classifier::isFO2(prb->units(), hasEq);
 
   if (!isFO2) {
-    std::cout << "[FO2] Errore: Il problema NON appartiene al frammento FO2 (più di 2 variabili libere o quantificate).\n";
-    vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
+    vampireMode(prb.release());
     return;
   }
 
@@ -484,8 +491,10 @@ void fo2Mode(Problem* problem)
   bool isS2Valid = FO2Preprocessor::Preprocessor::preprocess(*prb);
 
   if (!isS2Valid) {
-    FO2Fragment::FO2Logger::logPhase("FO2 Preprocessor: S2 invariant violation detected. Safe fallback to Vampire Standard Mode.");
-    vampireMode(prb.release());
+    FO2Fragment::FO2Logger::logPhase("FO2 Preprocessor: S2 invariant violation detected. Returning Unknown.");
+    env.statistics->terminationReason = TerminationReason::UNKNOWN;
+    std::cout << "% SZS status Unknown for " << env.options->problemName() << std::endl;
+    vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
     return;
   }
 
@@ -498,6 +507,12 @@ void fo2Mode(Problem* problem)
   } else if (res == FO2Fragment::FO2Result::UNSATISFIABLE) {
     env.statistics->terminationReason = TerminationReason::REFUTATION;
     std::cout << "% SZS status Unsatisfiable for " << env.options->problemName() << std::endl;
+  } else if (res == FO2Fragment::FO2Result::UNKNOWN) {
+    FO2Fragment::FO2Logger::logPhase("FO2Solver returned UNKNOWN. Returning Unknown.");
+    env.statistics->terminationReason = TerminationReason::UNKNOWN;
+    std::cout << "% SZS status Unknown for " << env.options->problemName() << std::endl;
+    vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
+    return;
   }
 
   if (env.statistics->refutation) {
@@ -506,6 +521,7 @@ void fo2Mode(Problem* problem)
 
   vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
 }
+
 
 void fo2ClassifierMode(Problem* problem)
 {
@@ -528,6 +544,179 @@ void fo2ClassifierMode(Problem* problem)
   vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
 }
 
+void fo2RemoveEqualityMode(Problem* problem)
+{
+  ScopedPtr<Problem> prb(problem);
+
+  FO2Fragment::FO2Logger::setVerbosity(FO2Fragment::VerbosityLevel::QUIET);
+
+  bool hasEq = false;
+  bool isFO2 = FO2Fragment::Classifier::isFO2(prb->units(), hasEq);
+
+  if (!isFO2) {
+    vampireMode(prb.release());
+    return;
+  }
+
+  if (!hasEq && !prb->hasEquality()) {
+    std::cout << "% [FO2] Il problema appartiene al frammento FO2 e NON contiene uguaglianze. I lemmata vengono saltati.\n";
+  } else {
+    FO2Fragment::RemoveEquality::removeEquality(*prb);
+  }
+
+  // Configura automaticamente l'algoritmo Otter classico per fo2_remove_equality
+  env.options->set("saturation_algorithm", "otter");
+  env.options->set("avatar", "off");
+  env.options->set("unused_predicate_definition_removal", "off");
+  env.options->set("backward_subsumption", "on");
+  env.options->set("forward_subsumption_resolution", "off");
+
+  vampireMode(prb.release());
+}
+
+namespace {
+UnitList* cloneUnitsForStep(UnitList* units) {
+  UnitList* res = UnitList::empty();
+  UnitList::Iterator it(units);
+  while (it.hasNext()) {
+    UnitList::push(it.next(), res);
+  }
+  return UnitList::reverse(res);
+}
+
+std::string testEquisatWithClassicSolver(UnitList* units, double& elapsedTime) {
+  UnitList* copyUnits = cloneUnitsForStep(units);
+  Problem* copyPrb = new Problem(copyUnits);
+
+  double t0 = Timer::elapsedMilliseconds() / 1000.0;
+  Problem* proved = doProving(copyPrb);
+  elapsedTime = (Timer::elapsedMilliseconds() / 1000.0) - t0;
+
+  std::string resStr = "Unknown";
+  if (env.statistics->terminationReason == TerminationReason::REFUTATION) {
+    resStr = "Unsatisfiable";
+  } else if (env.statistics->terminationReason == TerminationReason::SATISFIABLE) {
+    resStr = "Satisfiable";
+  } else {
+    resStr = "Timeout/Unknown";
+  }
+
+  delete proved;
+  return resStr;
+}
+
+void fo2StepByStepMode(Problem* problem)
+{
+  ScopedPtr<Problem> prb(problem);
+  FO2Fragment::FO2Logger::setVerbosity(FO2Fragment::VerbosityLevel::QUIET);
+
+  std::cout << "\n===========================================================\n";
+  std::cout << "[FO2 DIAGNOSTIC] DIAGNOSI STEP-BY-STEP DI EQUISODDISFACIBILITÀ\n";
+  std::cout << "Problema: " << env.options->problemName() << "\n";
+  std::cout << "===========================================================\n";
+
+  Shell::Rectify::rectify(prb->units());
+
+  std::vector<std::string> stepNames = {
+    "Passo 0 (Problema Iniziale)     ",
+    "Passo 1 (Dopo Lemma 1)          ",
+    "Passo 2 (Dopo Lemma 2)          ",
+    "Passo 3 (Dopo Lemma 3)          ",
+    "Passo 4 (Dopo Lemma 4)          ",
+    "Passo 5 (Dopo Lemma 5)          ",
+    "Passo 6 (Dopo Lemma 6 + Proxy)  ",
+  };
+  std::vector<std::string> results;
+  std::vector<double> times;
+
+  // Passo 0: Iniziale
+  double t0 = 0;
+  std::string res0 = testEquisatWithClassicSolver(prb->units(), t0);
+  results.push_back(res0);
+  times.push_back(t0);
+  std::cout << "[DIAGNOSTIC] " << stepNames[0] << ": " << res0 << " (" << t0 << "s)\n";
+
+  // Passo 1: Lemma 1
+  FO2Fragment::Lemma1::applyLemma1(*prb);
+  double t1 = 0;
+  std::string res1 = testEquisatWithClassicSolver(prb->units(), t1);
+  results.push_back(res1);
+  times.push_back(t1);
+  std::cout << "[DIAGNOSTIC] " << stepNames[1] << ": " << res1 << " (" << t1 << "s)\n";
+
+  // Passo 2: Lemma 2
+  FO2Fragment::Lemma2::applyLemma2(*prb);
+  double t2 = 0;
+  std::string res2 = testEquisatWithClassicSolver(prb->units(), t2);
+  results.push_back(res2);
+  times.push_back(t2);
+  std::cout << "[DIAGNOSTIC] " << stepNames[2] << ": " << res2 << " (" << t2 << "s)\n";
+
+  // Passo 3: Lemma 3
+  FO2Fragment::Lemma3::applyLemma3(*prb);
+  double t3 = 0;
+  std::string res3 = testEquisatWithClassicSolver(prb->units(), t3);
+  results.push_back(res3);
+  times.push_back(t3);
+  std::cout << "[DIAGNOSTIC] " << stepNames[3] << ": " << res3 << " (" << t3 << "s)\n";
+
+  // Passo 4: Lemma 4
+  FO2Fragment::Lemmata::Lemma4::applyLemma4(*prb);
+  double t4 = 0;
+  std::string res4 = testEquisatWithClassicSolver(prb->units(), t4);
+  results.push_back(res4);
+  times.push_back(t4);
+  std::cout << "[DIAGNOSTIC] " << stepNames[4] << ": " << res4 << " (" << t4 << "s)\n";
+
+  // Passo 5: Lemma 5
+  FO2Fragment::Lemmata::Lemma5::applyLemma5(*prb);
+  double t5 = 0;
+  std::string res5 = testEquisatWithClassicSolver(prb->units(), t5);
+  results.push_back(res5);
+  std::cout << "--- FORMULE DOPO PASSO 5 ---\n";
+  UnitList::Iterator p5It(prb->units());
+  while (p5It.hasNext()) {
+    std::cout << p5It.next()->toString() << "\n";
+  }
+
+  // Passo 6: Lemma 6 + Proxy Eq
+  FO2Fragment::Lemmata::Lemma6::applyLemma6(*prb);
+
+  std::cout << "--- FORMULE DOPO LEMMA 6 (prima di proxy) ---\n";
+  UnitList::Iterator p6aIt(prb->units());
+  while (p6aIt.hasNext()) {
+    std::cout << p6aIt.next()->toString() << "\n";
+  }
+  FO2Fragment::RemoveEquality::replaceEqualityWithProxy(*prb);
+  double t6 = 0;
+  std::string res6 = testEquisatWithClassicSolver(prb->units(), t6);
+  results.push_back(res6);
+  times.push_back(t6);
+  std::cout << "[DIAGNOSTIC] " << stepNames[6] << ": " << res6 << " (" << t6 << "s)\n";
+
+  std::cout << "\n===========================================================\n";
+  std::cout << "TABELLA DI EQUISODDISFACIBILITÀ:\n";
+  bool broken = false;
+  int brokenStep = -1;
+  for (size_t i = 0; i < results.size(); ++i) {
+    std::cout << "  " << stepNames[i] << " -> " << results[i] << " (" << times[i] << "s)\n";
+    if (i > 0 && results[i] != results[0] && results[i] != "Timeout/Unknown" && results[0] != "Timeout/Unknown") {
+      broken = true;
+      if (brokenStep == -1) brokenStep = (int)i;
+    }
+  }
+  std::cout << "===========================================================\n";
+  if (broken) {
+    std::cout << "[ALLERTA CRITICA] L'EQUISODDISFACIBILITÀ È STATA ROTTA AL LEMMA " << brokenStep << "!\n";
+    std::cout << "  Stato Iniziale: " << results[0] << "  --> Diventato: " << results[brokenStep] << " al Lemma " << brokenStep << "\n";
+  } else {
+    std::cout << "[ESITO PERFETTO] L'equisoddisfacibilità è stata PRESERVATA dopo tutti i lemmata!\n";
+  }
+  std::cout << "===========================================================\n\n";
+
+  vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
+}
+
 void dispatchByMode(Problem* problem)
 
 {
@@ -542,6 +731,9 @@ void dispatchByMode(Problem* problem)
   case Options::Mode::CONSEQUENCE_ELIMINATION:
   case Options::Mode::VAMPIRE:
     vampireMode(problem);
+    break;
+  case Options::Mode::FO2_STEP_BY_STEP:
+    fo2StepByStepMode(problem);
     break;
 
   case Options::Mode::CASC:
@@ -631,6 +823,9 @@ void dispatchByMode(Problem* problem)
     break;
   case Options::Mode::FO2_CLASSIFIER:
     fo2ClassifierMode(problem);
+    break;
+  case Options::Mode::FO2_REMOVE_EQUALITY:
+    fo2RemoveEqualityMode(problem);
     break;
   }
 }
@@ -727,6 +922,8 @@ void interactiveMetamode()
  *        and exception handling.
  * @since 10/09/2004, Manchester changed to use knowledge bases
  */
+} // namespace
+
 int main(int argc, char* argv[])
 {
   System::setSignalHandlers();

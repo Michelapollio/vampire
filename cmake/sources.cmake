@@ -51,6 +51,7 @@ set(UNIT_TESTS
     UnitTests/tDisagreement.cpp
     UnitTests/tDynamicHeap.cpp
     UnitTests/tFO2_RemoveEquality_Equisat.cpp
+    UnitTests/tFO2_StepByStep_Classic.cpp
     UnitTests/tFO2_Resolution.cpp
     UnitTests/tFunctionDefinitionHandler.cpp
     UnitTests/tIndexManager.cpp

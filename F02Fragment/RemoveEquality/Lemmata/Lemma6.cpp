@@ -1,6 +1,7 @@
 #include "Lemma6.hpp"
 #include "Lemma1.hpp"
 #include "Lemma2.hpp"
+#include "Lemma5.hpp"
 #include "F02Fragment/FO2Logger.hpp"
 
 #include "Kernel/Clause.hpp"
@@ -116,6 +117,21 @@ Formula* Lemma6::replaceVarWithTerm(Formula* formula, unsigned varIndex, TermLis
 /**
  * @brief Cerca ed estrae la sottoformula zeta(x) da una struttura di quantificatore d'unicita' (exists! x zeta(x)).
  */
+namespace {
+bool isUniquenessForall(Formula* f) {
+  if (!f || f->connective() != FORALL) return false;
+  Formula* arg = f->qarg();
+  if (!arg) return false;
+  if (arg->connective() == IMP) {
+    Formula* rhs = arg->right();
+    if (rhs && rhs->connective() == LITERAL && rhs->literal() && rhs->literal()->isEquality()) {
+      return true;
+    }
+  }
+  return false;
+}
+} // namespace
+
 Formula* Lemma6::extractZetaFromUniqueness(Formula* formula)
 {
   if (!formula) return nullptr;
@@ -123,18 +139,18 @@ Formula* Lemma6::extractZetaFromUniqueness(Formula* formula)
   if (formula->connective() == EXISTS) {
     Formula* body = formula->qarg();
     if (body && body->connective() == AND) {
-      bool hasForall = false;
+      bool hasUniquenessForall = false;
       Formula* candidateZeta = nullptr;
       FormulaList::Iterator it(body->args());
       while (it.hasNext()) {
         Formula* child = it.next();
-        if (child->connective() == FORALL) {
-          hasForall = true;
+        if (isUniquenessForall(child)) {
+          hasUniquenessForall = true;
         } else {
           candidateZeta = child;
         }
       }
-      if (hasForall && candidateZeta) {
+      if (hasUniquenessForall && candidateZeta) {
         return candidateZeta;
       }
     }
@@ -307,7 +323,7 @@ void Lemma6::generateCongruenceAxioms(Formula* zetaI, TermList constTerm, Formul
  */
 void Lemma6::applyLemma6(Problem &prb)
 {
-  FO2Logger::logPhase("Inizio Lemma 6: Eliminazione Quantificatori d'Unicita'");
+//  FO2Logger::logPhase("Inizio Lemma 6: Eliminazione Quantificatori d'Unicita'");
 
   UnitList* newUnits = UnitList::empty();
   bool createdConstants = false;
@@ -331,8 +347,8 @@ void Lemma6::applyLemma6(Problem &prb)
           normalizedZeta = replaceVarWithTerm(normalizedZeta, v, TermList::var(0));
         }
 
-        FO2Logger::logDebug("[Lemma 6] Trovata asserzione d'unicita' per zeta(x): " + normalizedZeta->toString());
-        FO2Logger::logDebug("[Lemma 6] Generata costante fresca: " + env.signature->getFunction(freshConstFunctor)->name());
+//        FO2Logger::logDebug("[Lemma 6] Trovata asserzione d'unicita' per zeta(x): " + normalizedZeta->toString());
+//        FO2Logger::logDebug("[Lemma 6] Generata costante fresca: " + env.signature->getFunction(freshConstFunctor)->name());
 
         FormulaList* axioms = FormulaList::empty();
         generateCongruenceAxioms(normalizedZeta, constTerm, axioms);
@@ -352,13 +368,11 @@ void Lemma6::applyLemma6(Problem &prb)
   prb.units() = UnitList::reverse(newUnits);
 
   if (createdConstants) {
-    FO2Logger::logDebug("[Lemma 6] Riapplicazione Lemma 1 per eliminare le costanti fresche e tornare a L2 puro...");
-    Lemma1::applyLemma1(prb);
-    FO2Logger::logDebug("[Lemma 6] Riapplicazione Lemma 2 per garantire la forma normale di Scott a 2 variabili...");
-    Lemma2::applyLemma2(prb);
+    // Lemma1::applyLemma1(prb);
+    //Lemma2::applyLemma2(prb);
   }
 
-  FO2Logger::logPhase("Lemma 6 Completato: Formula ridotta a L2 puro (senza uguaglianza)");
+//  FO2Logger::logPhase("Lemma 6 Completato: Formula ridotta a L2 puro (senza uguaglianza)");
 }
 
 } // namespace Lemmata

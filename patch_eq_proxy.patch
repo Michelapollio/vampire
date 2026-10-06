@@ -1,0 +1,9 @@
+--- F02Fragment/RemoveEquality/RemoveEquality.cpp
++++ F02Fragment/RemoveEquality/RemoveEquality.cpp
+@@ -194,6 +194,7 @@
+ 
+   FO2Logger::logLemma("AFTER LEMMA 6", prb);
+ 
++  Shell::EqualityProxyMono(Options::EqualityProxy::RS).apply(prb); // Try RS first
+   FO2Logger::logPhase("Equality removal completed");
+ }

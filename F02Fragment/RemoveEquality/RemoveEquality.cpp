@@ -15,6 +15,11 @@
 #include "Shell/EqualityProxy.hpp"
 #include "Shell/EqualityProxyMono.hpp"
 #include "Shell/Options.hpp"
+#include "Shell/DistinctGroupExpansion.hpp"
+#include "Shell/Rectify.hpp"
+#include "Shell/NNF.hpp"
+#include "Shell/Flattening.hpp"
+#include "Shell/SimplifyFalseTrue.hpp"
 
 #include "Lib/Environment.hpp"
 
@@ -65,8 +70,137 @@ void RemoveEquality::Lemma6Application(Kernel::Problem &prb)
   FO2Fragment::Lemmata::Lemma6::applyLemma6(prb);
 }
 
+namespace {
+
+Formula* normalizeEqualityFormula(Formula* f) {
+  if (!f) return nullptr;
+  switch (f->connective()) {
+    case LITERAL: {
+      Literal* lit = f->literal();
+      if (lit && lit->isEquality()) {
+        TermList arg0 = *lit->nthArgument(0);
+        TermList arg1 = *lit->nthArgument(1);
+        if (arg0.isVar() && arg1.isVar() && !lit->isTwoVarEquality()) {
+          Literal* newLit = Literal::createEquality(lit->polarity(), arg0, arg1, AtomicSort::defaultSort());
+          return new AtomicFormula(newLit);
+        }
+      }
+      return f;
+    }
+    case NOT: {
+      Formula* newArg = normalizeEqualityFormula(f->uarg());
+      if (newArg != f->uarg()) return new NegatedFormula(newArg);
+      return f;
+    }
+    case AND:
+    case OR: {
+      FormulaList* args = f->args();
+      FormulaList* newArgs = FormulaList::empty();
+      bool changed = false;
+      FormulaList::Iterator it(args);
+      while (it.hasNext()) {
+        Formula* arg = it.next();
+        Formula* newArg = normalizeEqualityFormula(arg);
+        if (newArg != arg) changed = true;
+        FormulaList::push(newArg, newArgs);
+      }
+      newArgs = FormulaList::reverse(newArgs);
+      if (changed) return JunctionFormula::generalJunction(f->connective(), newArgs);
+      FormulaList::destroy(newArgs);
+      return f;
+    }
+    case IMP:
+    case IFF:
+    case XOR: {
+      Formula* newLeft = normalizeEqualityFormula(f->left());
+      Formula* newRight = normalizeEqualityFormula(f->right());
+      if (newLeft != f->left() || newRight != f->right()) {
+        return new BinaryFormula(f->connective(), newLeft, newRight);
+      }
+      return f;
+    }
+    case FORALL:
+    case EXISTS: {
+      Formula* newQarg = normalizeEqualityFormula(f->qarg());
+      if (newQarg != f->qarg()) {
+        return new QuantifiedFormula(f->connective(), f->vars(), newQarg);
+      }
+      return f;
+    }
+    default:
+      return f;
+  }
+}
+
+void normalizeEqualitiesInProblem(Problem& prb) {
+  UnitList::DelIterator it(prb.units());
+  while (it.hasNext()) {
+    Unit* u = it.next();
+    if (!u->isClause()) {
+      FormulaUnit* fu = static_cast<FormulaUnit*>(u);
+      Formula* norm = normalizeEqualityFormula(fu->formula());
+      if (norm != fu->formula()) {
+        FormulaUnit* newFu = new FormulaUnit(norm, fu->inference());
+        it.replace(newFu);
+      }
+    }
+  }
+}
+
+static unsigned s_eqProxySymbol = 0;
+
+static Literal* replaceEqLiteral(Literal* lit) {
+  if (!lit->isEquality()) return lit;
+  if (s_eqProxySymbol == 0) {
+    s_eqProxySymbol = env.signature->addFreshPredicate(2, "eq0");
+  }
+  TermList arg0 = *lit->nthArgument(0);
+  TermList arg1 = *lit->nthArgument(1);
+  TermList args[2] = {arg0, arg1};
+  return Literal::create(s_eqProxySymbol, 2, lit->polarity(), args);
+} 
+} // namespace
+
+Formula* RemoveEquality::replaceEqInFormula(Formula* f) {
+  if (!f) return nullptr;
+  switch (f->connective()) {
+    case LITERAL:
+      return new AtomicFormula(replaceEqLiteral(f->literal()));
+    case NOT:
+      return new NegatedFormula(replaceEqInFormula(f->uarg()));
+    case AND:
+    case OR: {
+      FormulaList* newArgs = nullptr;
+      FormulaList::Iterator it(f->args());
+      while (it.hasNext()) {
+        FormulaList::push(replaceEqInFormula(it.next()), newArgs);
+      }
+      return JunctionFormula::generalJunction(f->connective(), FormulaList::reverse(newArgs));
+    }
+    case IMP:
+    case IFF:
+    case XOR:
+      return new BinaryFormula(f->connective(), replaceEqInFormula(f->left()), replaceEqInFormula(f->right()));
+    case FORALL:
+    case EXISTS: {
+      QuantifiedFormula* qf = static_cast<QuantifiedFormula*>(f);
+      return new QuantifiedFormula(qf->connective(), qf->varList(), replaceEqInFormula(qf->subformula()));
+    }
+    default:
+      return f;
+  }
+}
+
 void RemoveEquality::removeEquality(Kernel::Problem &prb)
 {
+  // Phase 0: Expand TPTP distinct object groups BEFORE equality removal.
+  // e.g. "Apple" != "Microsoft" must be made explicit before Lemma1 runs,
+  // otherwise the distinct-object semantics are lost after equality removal.
+  if (env.signature->hasDistinctGroups()) {
+    FO2Logger::logDebug("RemoveEquality: expanding distinct groups before lemmata");
+    Shell::DistinctGroupExpansion(0 /* 0 = always expand */).apply(prb);
+  }
+
   bool hasEq = false;
   bool isFO2 = Classifier::isFO2(prb.units(), hasEq);
 
@@ -79,6 +213,24 @@ void RemoveEquality::removeEquality(Kernel::Problem &prb)
     FO2Logger::logPhase("Problem belongs to the FO2 fragment and does NOT contain equality. Skipping lemmata.");
     return;
   }
+
+  normalizeEqualitiesInProblem(prb);
+  Shell::Rectify::rectify(prb.units());
+
+  // Convert formulas to NNF (Negation Normal Form) so negations are at literal level
+  // and implications/equivalences are expanded before Lemmata 1-6.
+  /*UnitList::DelIterator nnfIt(prb.units());
+  while (nnfIt.hasNext()) {
+    Unit* u = nnfIt.next();
+    if (!u->isClause()) {
+      FormulaUnit* fu = static_cast<FormulaUnit*>(u);
+      fu = Shell::Rectify::rectify(fu);
+      fu = Shell::NNF::nnf(fu);
+      fu = Shell::Flattening::flatten(fu);
+      fu = Shell::SimplifyFalseTrue::simplify(fu);
+      nnfIt.replace(fu);
+    }
+  }*/
 
   FO2Logger::logPhase("Starting equality removal procedure (RemoveEquality)");
 
@@ -102,7 +254,84 @@ void RemoveEquality::removeEquality(Kernel::Problem &prb)
 
   FO2Logger::logLemma("AFTER LEMMA 6", prb);
 
+  // Final Pass: Replace any remaining equality literals (= / !=) with proxy predicate eq0
+  replaceEqualityWithProxy(prb);
+
   FO2Logger::logPhase("Equality removal completed");
+}
+
+void RemoveEquality::replaceEqualityWithProxy(Kernel::Problem &prb)
+{
+  bool replacedAnyEq = false;
+
+  UnitList::DelIterator eqProxyIt(prb.units());
+  while (eqProxyIt.hasNext()) {
+    Unit* u = eqProxyIt.next();
+    if (!u->isClause()) {
+      FormulaUnit* fu = static_cast<FormulaUnit*>(u);
+      Formula* newForm = replaceEqInFormula(fu->formula());
+      FormulaUnit* targetFu = fu;
+      if (newForm != fu->formula()) {
+        replacedAnyEq = true;
+        targetFu = new FormulaUnit(newForm, fu->inference());
+      }
+      FormulaUnit* simpFu = Shell::SimplifyFalseTrue::simplify(targetFu);
+      eqProxyIt.replace(simpFu);
+    }
+  }
+
+  if (s_eqProxySymbol == 0) {
+    for (unsigned p = 1; p < env.signature->predicates(); ++p) {
+      Signature::Symbol* sym = env.signature->getPredicate(p);
+      if (sym && sym->name() == "eq0") {
+        s_eqProxySymbol = p;
+        break;
+      }
+    }
+  }
+
+  if (replacedAnyEq || s_eqProxySymbol != 0) {
+    if (s_eqProxySymbol == 0) {
+      s_eqProxySymbol = env.signature->addFreshPredicate(2, "eq0");
+    }
+
+    TermList var0 = TermList::var(0);
+    TermList var1 = TermList::var(1);
+    TermList args00[2] = {var0, var0};
+    TermList args01[2] = {var0, var1};
+    TermList args10[2] = {var1, var0};
+
+    // 1. Reflexivity: eq0(X0, X0)
+    Lib::Stack<Literal*> reflLits;
+    reflLits.push(Literal::create(s_eqProxySymbol, 2, true, args00));
+    Clause* reflCl = Clause::fromStack(reflLits, Inference(FromInput(UnitInputType::AXIOM)));
+    UnitList::push(reflCl, prb.units());
+
+    // 2. Symmetry: ~eq0(X0, X1) | eq0(X1, X0)
+    Lib::Stack<Literal*> symLits;
+    symLits.push(Literal::create(s_eqProxySymbol, 2, false, args01));
+    symLits.push(Literal::create(s_eqProxySymbol, 2, true, args10));
+    Clause* symCl = Clause::fromStack(symLits, Inference(FromInput(UnitInputType::AXIOM)));
+    UnitList::push(symCl, prb.units());
+
+    // 3. Predicate Congruence: ~eq0(X0, X1) | ~P(X0) | P(X1) for all unary predicates P
+    unsigned numPreds = env.signature->predicates();
+    for (unsigned p = 1; p < numPreds; ++p) {
+      if (p == s_eqProxySymbol || env.signature->isEqualityPredicate(p)) continue;
+      Signature::Symbol* sym = env.signature->getPredicate(p);
+      if (!sym || sym->interpreted()) continue;
+      if (sym->arity() == 1) {
+        TermList a0[1] = {var0};
+        TermList a1[1] = {var1};
+        Lib::Stack<Literal*> congLits;
+        congLits.push(Literal::create(s_eqProxySymbol, 2, false, args01));
+        congLits.push(Literal::create(p, 1, false, a0));
+        congLits.push(Literal::create(p, 1, true, a1));
+        Clause* congCl = Clause::fromStack(congLits, Inference(FromInput(UnitInputType::AXIOM)));
+        UnitList::push(congCl, prb.units());
+      }
+    }
+  }
 }
 
 void RemoveEquality::traceProblem(Kernel::Problem &prb)

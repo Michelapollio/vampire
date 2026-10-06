@@ -24,6 +24,8 @@ public:
   static void removeEquality(Kernel::Problem& prb);
   
 
+  static void replaceEqualityWithProxy(Kernel::Problem& prb);
+  static Kernel::Formula* replaceEqInFormula(Kernel::Formula* formula);
   // Tracing diagnostic functions (read-only, do not modify the problem)
   static void traceProblem(Kernel::Problem& prb);
   static void traceFormula(Kernel::Formula* formula, int depth);

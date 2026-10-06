@@ -27,6 +27,7 @@ private:
   static bool extractLiteralsFromFormula(Kernel::Formula* form, std::vector<Kernel::Literal*>& lits);
   static bool decomposeLiterals(const std::vector<Kernel::Literal*>& lits, std::vector<Kernel::Literal*>& gammaLits, std::vector<Kernel::Literal*>& deltaLits);
   static bool decomposeType3Clause(Kernel::Clause* cl, std::vector<Kernel::Literal*>& gammaLits, std::vector<Kernel::Literal*>& deltaLits);
+  static Kernel::Formula* processFormula(Kernel::Formula* form, unsigned &transformedCount);
 };
 
 } // namespace Lemmata
