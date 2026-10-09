@@ -7,7 +7,8 @@
 namespace FO2Fragment {
 
 /**
- * @brief Implementation of Lemma 2 (Introduction of definition predicates for complex subformulas).
+ * @brief Converts an FO2 formula into equisatisfiable Scott normal form,
+ *        using fresh predicates and universally/existentially quantified CNF definitions.
  */
 class Lemma2 {
 public:

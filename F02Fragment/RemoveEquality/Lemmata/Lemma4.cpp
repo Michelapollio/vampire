@@ -1,506 +1,537 @@
 #include "Lemma4.hpp"
 
-#include "Kernel/TermIterators.hpp"
 #include "Kernel/Clause.hpp"
-#include "Kernel/Inference.hpp"
 #include "Kernel/Formula.hpp"
 #include "Kernel/FormulaUnit.hpp"
-#include "Kernel/SortHelper.hpp"
+#include "Kernel/Inference.hpp"
 #include "Kernel/Problem.hpp"
+#include "Kernel/RobSubstitution.hpp"
+#include "Kernel/SortHelper.hpp"
+#include "Kernel/TermIterators.hpp"
 #include "Kernel/Unit.hpp"
+#include "Lib/List.hpp"
 #include "Lib/Stack.hpp"
-#include "F02Fragment/ScottTypes.hpp"
+#include "Shell/Rectify.hpp"
 #include "F02Fragment/FO2Logger.hpp"
-#include <vector>
+
+#include <algorithm>
 #include <deque>
-#include <unordered_set>
-#include <iostream>
+#include <unordered_map>
 #include <string>
+#include <unordered_set>
+#include <vector>
 
 namespace FO2Fragment {
 namespace Lemmata {
-
 namespace {
 
-/**
- * @brief Restituisce il termine con le variabili X0 e X1 scambiate (X0 <-> X1).
- */
-Kernel::TermList swapVar(Kernel::TermList t)
+using namespace Kernel;
+
+constexpr unsigned X = 0;
+constexpr unsigned Y = 1;
+
+struct Type2Clause {
+  Kernel::Clause *clause;
+  Kernel::FormulaUnit *owner;
+  unsigned x;
+  unsigned y;
+};
+
+TermList swapXY(TermList term)
 {
-  if (t.isVar()) {
-    if (t.var() == 0) return Kernel::TermList::var(1);
-    if (t.var() == 1) return Kernel::TermList::var(0);
+  if (!term.isVar()) return term;
+  if (term.var() == X) return TermList::var(Y);
+  if (term.var() == Y) return TermList::var(X);
+  return term;
+}
+
+bool containsBothVariables(const Literal *lit)
+{
+  bool hasX = false;
+  bool hasY = false;
+  VariableIterator it(lit);
+  while (it.hasNext()) {
+    TermList term = it.next();
+    if (!term.isVar()) continue;
+    hasX = hasX || term.var() == X;
+    hasY = hasY || term.var() == Y;
   }
-  return t;
+  return hasX && hasY;
+}
+
+Clause *normalizeClauseVariables(Clause *clause)
+{
+  std::unordered_map<unsigned, unsigned> varMap;
+  unsigned nextVar = 0;
+  for (unsigned i = 0; i < clause->length(); ++i) {
+    VariableIterator it((*clause)[i]);
+    while (it.hasNext()) {
+      unsigned oldVar = it.next().var();
+      if (varMap.find(oldVar) == varMap.end()) {
+        varMap.emplace(oldVar, nextVar++);
+      }
+    }
+  }
+
+  if (varMap.size() > 2 || varMap.empty()) return clause;
+
+  RobSubstitution subst;
+  for (const auto &entry : varMap) {
+    subst.unify(TermList::var(entry.first), 0,
+                TermList::var(entry.second), 1);
+  }
+
+  Stack<Literal *> literals;
+  for (unsigned i = 0; i < clause->length(); ++i) {
+    literals.push(subst.apply((*clause)[i], 0));
+  }
+  return Clause::fromStack(literals, clause->inference());
+}
+
+bool areComplementaryUnderRename(const Literal *left, const Literal *right, bool &swap)
+{
+  if (left->functor() != right->functor() || left->arity() != right->arity() ||
+      left->isPositive() == right->isPositive() || left->isEquality()) {
+    return false;
+  }
+
+  bool exact = true;
+  for (unsigned i = 0; i < left->arity(); ++i) {
+    exact = exact && (*left->nthArgument(i) == *right->nthArgument(i));
+  }
+  if (exact) {
+    swap = false;
+    return true;
+  }
+
+  bool exchanged = true;
+  for (unsigned i = 0; i < left->arity(); ++i) {
+    exchanged = exchanged && (*left->nthArgument(i) == swapXY(*right->nthArgument(i)));
+  }
+  if (exchanged) {
+    swap = true;
+    return true;
+  }
+  return false;
+}
+
+Literal *swapVariables(Literal *lit)
+{
+  if (lit->isEquality()) {
+    return Literal::createEquality(lit->isPositive(),
+        swapXY(*lit->nthArgument(0)), swapXY(*lit->nthArgument(1)),
+        lit->isTwoVarEquality() ? lit->twoVarEqSort() : AtomicSort::defaultSort());
+  }
+  std::vector<TermList> args;
+  args.reserve(lit->arity());
+  for (unsigned i = 0; i < lit->arity(); ++i) args.push_back(swapXY(*lit->nthArgument(i)));
+  return Literal::create(lit->functor(), lit->arity(), lit->isPositive(), args.data());
+}
+
+std::string clauseKey(const Clause *clause)
+{
+  std::vector<std::string> literals;
+  literals.reserve(clause->length());
+  for (unsigned i = 0; i < clause->length(); ++i) literals.push_back((*clause)[i]->toString());
+  std::sort(literals.begin(), literals.end());
+  std::string key;
+  for (const std::string &literal : literals) key += literal + " | ";
+  return key;
+}
+
+Clause *makeClause(const std::vector<Literal *> &literals, Unit *parentA, Unit *parentB = nullptr)
+{
+  Stack<Literal *> stack;
+  for (Literal *lit : literals) stack.push(lit);
+  Inference inference = parentB
+      ? Inference(NonspecificInference2(InferenceRule::RESOLUTION, parentA, parentB))
+      : Inference(NonspecificInference1(InferenceRule::CLAUSIFY, parentA));
+  return Clause::fromStack(stack, inference);
+}
+
+Clause *simplifyType2ClauseUnderDistinct(Clause *clause, unsigned x, unsigned y)
+{
+  std::vector<Literal *> remaining;
+  for (unsigned i = 0; i < clause->length(); ++i) {
+    Literal *lit = (*clause)[i];
+    if (!lit->isEquality()) {
+      remaining.push_back(lit);
+      continue;
+    }
+
+    TermList left = *lit->nthArgument(0);
+    TermList right = *lit->nthArgument(1);
+    if (!left.isVar() || !right.isVar()) {
+      remaining.push_back(lit);
+      continue;
+    }
+
+    const bool reflexive = left.var() == right.var();
+    const bool guardedPair = (left.var() == x && right.var() == y) ||
+                             (left.var() == y && right.var() == x);
+    if (!reflexive && !guardedPair) {
+      remaining.push_back(lit);
+      continue;
+    }
+
+    const bool equalityTrue = reflexive;
+    const bool literalTrue = lit->isPositive() ? equalityTrue : !equalityTrue;
+    if (literalTrue) return nullptr; // The disjunction is already true.
+    // A false equality literal contributes nothing to the disjunction.
+  }
+
+  Stack<Literal *> normalized;
+  for (Literal *lit : remaining) normalized.push(lit);
+  return Clause::fromStack(normalized, clause->inference());
+}
+
+void resolveRestricted(const Clause *left, const Clause *right,
+                       std::vector<Clause *> &resolvents)
+{
+  for (unsigned i = 0; i < left->length(); ++i) {
+    Literal *pivotLeft = (*left)[i];
+    if (pivotLeft->isEquality() || !containsBothVariables(pivotLeft)) continue;
+
+    for (unsigned j = 0; j < right->length(); ++j) {
+      Literal *pivotRight = (*right)[j];
+      if (pivotRight->isEquality() || !containsBothVariables(pivotRight)) continue;
+
+      bool swap = false;
+      if (!areComplementaryUnderRename(pivotLeft, pivotRight, swap)) continue;
+
+      std::vector<Literal *> remainder;
+      for (unsigned k = 0; k < left->length(); ++k) {
+        if (k != i) remainder.push_back((*left)[k]);
+      }
+      for (unsigned k = 0; k < right->length(); ++k) {
+        if (k != j) remainder.push_back(swap ? swapVariables((*right)[k]) : (*right)[k]);
+      }
+
+      // Normalize the resolvent and discard tautologies before constructing it.
+      std::vector<Literal *> normalized;
+      std::unordered_set<std::string> seen;
+      bool tautology = false;
+      for (Literal *lit : remainder) {
+        const std::string key = lit->toString();
+        const std::string opposite = Literal::complementaryLiteral(lit)->toString();
+        if (seen.find(opposite) != seen.end()) {
+          tautology = true;
+          break;
+        }
+        if (seen.insert(key).second) normalized.push_back(lit);
+      }
+      if (!tautology) {
+        resolvents.push_back(makeClause(normalized, const_cast<Clause *>(left),
+                                        const_cast<Clause *>(right)));
+      }
+    }
+  }
+}
+
+Literal *formulaLiteral(Formula *formula)
+{
+  if (!formula) return nullptr;
+  if (formula->connective() == LITERAL) return formula->literal();
+  if (formula->connective() == NOT && formula->uarg() && formula->uarg()->connective() == LITERAL) {
+    return Literal::create(formula->uarg()->literal(), false);
+  }
+  return nullptr;
+}
+
+bool appendDisjunctLiterals(Formula *formula, std::vector<Literal *> &literals)
+{
+  if (!formula) return false;
+  if (formula->connective() == OR) {
+    FormulaList::Iterator it(formula->args());
+    while (it.hasNext()) {
+      if (!appendDisjunctLiterals(it.next(), literals)) return false;
+    }
+    return true;
+  }
+  Literal *lit = formulaLiteral(formula);
+  if (!lit) return false;
+  literals.push_back(lit);
+  return true;
+}
+
+bool appendCnfClauses(Formula *formula, Unit *parent, std::vector<Clause *> &clauses)
+{
+  if (!formula) return false;
+  if (formula->connective() == AND) {
+    std::vector<Clause *> extracted;
+    FormulaList::Iterator it(formula->args());
+    while (it.hasNext()) {
+      if (!appendCnfClauses(it.next(), parent, extracted)) return false;
+    }
+    clauses.insert(clauses.end(), extracted.begin(), extracted.end());
+    return true;
+  }
+
+  std::vector<Literal *> literals;
+  if (formula->connective() == OR) {
+    if (!appendDisjunctLiterals(formula, literals)) return false;
+  } else {
+    Literal *lit = formulaLiteral(formula);
+    if (!lit) return false;
+    literals.push_back(lit);
+  }
+  clauses.push_back(makeClause(literals, parent));
+  return true;
+}
+
+bool isDistinctGuard(Literal *lit, unsigned x, unsigned y)
+{
+  if (!lit || !lit->isEquality() || lit->isPositive()) return false;
+  TermList a = *lit->nthArgument(0);
+  TermList b = *lit->nthArgument(1);
+  return a.isVar() && b.isVar() &&
+         ((a.var() == x && b.var() == y) || (a.var() == y && b.var() == x));
+}
+
+bool getSingleBoundVariable(Formula *formula, unsigned &var)
+{
+  if (!formula || !formula->vars()) return false;
+  VSList::Iterator it(formula->vars());
+  if (!it.hasNext()) return false;
+  var = it.next().first;
+  return !it.hasNext();
+}
+
+bool extractType3(FormulaUnit *unit, std::vector<Clause *> &clauses)
+{
+  Formula *prefix = unit->formula();
+  unsigned boundCount = 0;
+  while (prefix && prefix->connective() == FORALL) {
+    VSList::Iterator it(prefix->vars());
+    while (it.hasNext()) {
+      it.next();
+      ++boundCount;
+    }
+    prefix = prefix->qarg();
+  }
+  if (boundCount != 2 || !prefix || prefix->connective() == FORALL ||
+      prefix->connective() == EXISTS) return false;
+
+  std::vector<Clause *> extracted;
+  if (!appendCnfClauses(prefix, unit, extracted)) return false;
+  for (Clause *clause : extracted) {
+    bool hasGuard = false;
+    for (unsigned i = 0; i < clause->length(); ++i) {
+      Literal *lit = (*clause)[i];
+      if (!lit->isEquality()) continue;
+      if (!lit->isPositive()) return false;
+      TermList left = *lit->nthArgument(0), right = *lit->nthArgument(1);
+      if (!left.isVar() || !right.isVar()) return false;
+      const bool isGuard = (left.var() == X && right.var() == Y) ||
+                           (left.var() == Y && right.var() == X);
+      if (!isGuard) return false;
+      hasGuard = true;
+    }
+    if (!hasGuard) return false;
+  }
+  clauses.insert(clauses.end(), extracted.begin(), extracted.end());
+  return true;
+}
+
+bool extractType2(FormulaUnit *unit, std::vector<Clause *> &clauses,
+                  unsigned &x, unsigned &y)
+{
+  Formula *forall = unit->formula();
+  if (!forall || forall->connective() != FORALL || !getSingleBoundVariable(forall, x)) return false;
+  Formula *exists = forall->qarg();
+  if (!exists || exists->connective() != EXISTS || !getSingleBoundVariable(exists, y)) return false;
+  Formula *matrix = exists->qarg();
+
+  std::vector<Formula *> conjuncts;
+  if (matrix && matrix->connective() == AND) {
+    FormulaList::Iterator it(matrix->args());
+    while (it.hasNext()) conjuncts.push_back(it.next());
+  } else {
+    conjuncts.push_back(matrix);
+  }
+
+  std::vector<Clause *> extracted;
+  bool foundGuard = false;
+  for (Formula *conjunct : conjuncts) {
+    Literal *lit = formulaLiteral(conjunct);
+    if (lit && isDistinctGuard(lit, x, y)) {
+      foundGuard = true;
+      continue;
+    }
+    if (!appendCnfClauses(conjunct, unit, extracted)) return false;
+  }
+  if (!foundGuard) return false;
+  for (Clause *clause : extracted) {
+    for (unsigned i = 0; i < clause->length(); ++i) {
+      if ((*clause)[i]->isEquality()) return false;
+    }
+  }
+  clauses.insert(clauses.end(), extracted.begin(), extracted.end());
+  return true;
+}
+
+Formula *clauseFormula(Clause *clause)
+{
+  FormulaList *disjuncts = FormulaList::empty();
+  for (unsigned i = clause->length(); i > 0; --i) {
+    FormulaList::push(new AtomicFormula((*clause)[i - 1]), disjuncts);
+  }
+  Formula *cnfClause = clause->length() == 0
+      ? Formula::falseFormula()
+      : clause->length() == 1 ? static_cast<Formula *>(new AtomicFormula((*clause)[0]))
+                              : JunctionFormula::generalJunction(OR, disjuncts);
+  if (clause->length() <= 1) FormulaList::destroy(disjuncts);
+  return cnfClause;
+}
+
+FormulaUnit *addType2Resolvents(FormulaUnit *unit, const std::vector<Clause *> &resolvents)
+{
+  if (resolvents.empty()) return unit;
+  Formula *forall = unit->formula();
+  Formula *exists = forall->qarg();
+  Formula *matrix = exists->qarg();
+  for (Clause *resolvent : resolvents) {
+    FormulaList *args = FormulaList::empty();
+    FormulaList::push(clauseFormula(resolvent), args);
+    FormulaList::push(matrix, args);
+    matrix = JunctionFormula::generalJunction(AND, args);
+  }
+  Formula *newExists = new QuantifiedFormula(EXISTS, exists->vars(), matrix);
+  Formula *newForall = new QuantifiedFormula(FORALL, forall->vars(), newExists);
+  return new FormulaUnit(newForall, unit->inference());
+}
+
+bool isType3RemovalCandidate(const Clause *clause)
+{
+  for (unsigned i = 0; i < clause->length(); ++i) {
+    Literal *lit = (*clause)[i];
+    if (!lit->isEquality() && containsBothVariables(lit)) return true;
+  }
+  return false;
 }
 
 } // namespace
 
-/**
- * @brief Controlla se un letterale contiene sia la variabile 0 (X0) che la variabile 1 (X1).
- */
-bool Lemma4::isBinaryLiteral(Kernel::Literal* lit)
-{
-  bool hasX = false;
-  bool hasY = false;
-
-  Kernel::VariableIterator vit(lit);
-  while (vit.hasNext()) {
-    Kernel::TermList tl = vit.next();
-    unsigned var = tl.var();
-    if (var == 0) {
-      hasX = true;
-    } else if (var == 1) {
-      hasY = true;
-    }
-  }
-
-  return hasX && hasY;
-}
-
-/**
- * @brief Controlla se due letterali binari sono opposti (con o senza scambio X0 <-> X1).
- */
-bool Lemma4::areResolvable(Kernel::Literal* litA, Kernel::Literal* litB, bool& needsSwap)
-{
-  if (litA->functor() != litB->functor() || litA->polarity() == litB->polarity()) {
-    return false;
-  }
-
-  if (*litA->nthArgument(0) == *litB->nthArgument(0) &&
-      *litA->nthArgument(1) == *litB->nthArgument(1)) {
-    needsSwap = false;
-    return true;
-  }
-
-  if (*litA->nthArgument(0) == swapVar(*litB->nthArgument(0)) &&
-      *litA->nthArgument(1) == swapVar(*litB->nthArgument(1))) {
-    needsSwap = true;
-    return true;
-  }
-
-  return false;
-}
-
-/**
- * @brief Restituisce un nuovo letterale scambiando le variabili X0 e X1 al suo interno.
- */
-Kernel::Literal* Lemma4::swapVarsInLiteral(Kernel::Literal* lit)
-{
-  if (lit->isEquality()) {
-    Kernel::TermList srt = Kernel::AtomicSort::defaultSort();
-    if (lit->isTwoVarEquality()) {
-      srt = lit->twoVarEqSort();
-    } else {
-      if (!Kernel::SortHelper::tryGetResultSort(*lit->nthArgument(0), srt)) {
-        Kernel::SortHelper::tryGetResultSort(*lit->nthArgument(1), srt);
-      }
-    }
-    Kernel::Literal* res = Kernel::Literal::createEquality(lit->polarity(), 
-                                           swapVar(*lit->nthArgument(0)), 
-                                           swapVar(*lit->nthArgument(1)), 
-                                           srt);
-    return res;
-  }
-
-  unsigned arity = lit->arity();
-  std::vector<Kernel::TermList> args;
-  args.reserve(arity);
-  for (unsigned i = 0; i < arity; i++) {
-    args.push_back(swapVar(*lit->nthArgument(i)));
-  }
-
-  return Kernel::Literal::create(lit->functor(), arity, lit->polarity(), args.data());
-}
-
-/**
- * @brief Esegue la risoluzione ristretta (sui letterali binari) tra due clausole.
- */
-void Lemma4::resolveRestricted(Kernel::Clause* clA, Kernel::Clause* clB, std::vector<Kernel::Clause*>& newResolvents)
-{
-  unsigned lenA = clA->length();
-  unsigned lenB = clB->length();
-
-  for (unsigned i = 0; i < lenA; i++) {
-    Kernel::Literal* litA = (*clA)[i];
-    
-    if (!isBinaryLiteral(litA) || litA->isEquality()) continue;
-
-    for (unsigned j = 0; j < lenB; j++) {
-      Kernel::Literal* litB = (*clB)[j];
-      
-      if (!isBinaryLiteral(litB) || litB->isEquality()) continue;
-
-      bool needsSwap = false;
-      if (areResolvable(litA, litB, needsSwap)) {
-        
-        Lib::Stack<Kernel::Literal*> resLits;
-
-        for (unsigned k = 0; k < lenA; k++) {
-          if (k != i) {
-            Kernel::Literal* toAdd = (*clA)[k];
-            bool isDuplicate = false;
-            for (unsigned m = 0; m < resLits.size(); m++) {
-              if (resLits[m] == toAdd) { isDuplicate = true; break; }
-            }
-            if (!isDuplicate) resLits.push(toAdd);
-          }
-        }
-
-        for (unsigned k = 0; k < lenB; k++) {
-          if (k != j) {
-            Kernel::Literal* toAdd = (*clB)[k];
-            if (needsSwap) {
-              toAdd = swapVarsInLiteral(toAdd);
-            }
-            
-            bool isDuplicate = false;
-            for (unsigned m = 0; m < resLits.size(); m++) {
-              if (resLits[m] == toAdd) {
-                isDuplicate = true;
-                break;
-              }
-            }
-            if (!isDuplicate) {
-              resLits.push(toAdd);
-            }
-          }
-        }
-
-        bool isTautology = false;
-        for (unsigned k = 0; k < resLits.size(); k++) {
-          for (unsigned m = k + 1; m < resLits.size(); m++) {
-            if (Kernel::Literal::complementaryLiteral(resLits[k]) == resLits[m]) {
-              isTautology = true;
-              break;
-            }
-          }
-          if (isTautology) break;
-        }
-
-        if (isTautology) {
-          continue;
-        }
-
-        Kernel::Inference inf(Kernel::NonspecificInference2(Kernel::InferenceRule::RESOLUTION, clA, clB));
-        Kernel::Clause* resolvent = Kernel::Clause::fromStack(resLits, inf);
-
-//        if (FO2Logger::showsDebug()) {
-//          FO2Logger::logDebug("[Lemma 4] Generato risolvente ristretto" + std::string(needsSwap ? " (con scambio di variabili)" : "") + ": " + resolvent->toNiceString());
-//        }
-        newResolvents.push_back(resolvent);
-      }
-    }
-  }
-}
-
-static Kernel::Literal* ensureValidTwoVarEquality(Kernel::Literal* lit) {
-  if (lit && lit->isEquality() && lit->nthArgument(0)->isVar() && lit->nthArgument(1)->isVar() && !lit->isTwoVarEquality()) {
-    return Kernel::Literal::createEquality(lit->polarity(), *lit->nthArgument(0), *lit->nthArgument(1), Kernel::AtomicSort::defaultSort());
-  }
-  return lit;
-}
-
-/**
- * @brief Converte una formula atomica o negata in un Literal, nullptr altrimenti.
- */
-Kernel::Literal* Lemma4::formulaToLiteral(Kernel::Formula* formula)
-{
-  if (!formula) return nullptr;
-
-  if (formula->connective() == LITERAL) {
-    return ensureValidTwoVarEquality(formula->literal());
-  }
-
-  if (formula->connective() == NOT && formula->uarg()->connective() == LITERAL) {
-    Kernel::Literal* inner = formula->uarg()->literal();
-    return ensureValidTwoVarEquality(Kernel::Literal::create(inner, !inner->polarity()));
-  }
-
-  return nullptr;
-}
-
-/**
- * @brief Rimuove i quantificatori universali esterni ∀x∀y da una formula di Tipo 3.
- */
-Kernel::Formula* Lemma4::stripForallXY(Kernel::Formula* formula)
-{
-  while (formula && formula->connective() == FORALL) {
-    formula = formula->qarg();
-  }
-  return formula;
-}
-
-/**
- * @brief Estrae le clausole da una formula matrice (corpo di ∀x∀y).
- */
-void Lemma4::extractClausesFromBody(Kernel::Formula* body, Kernel::Unit* parent, std::vector<Kernel::Clause*>& out)
-{
-  if (!body) return;
-
-  switch (body->connective()) {
-    case LITERAL:
-    case NOT: {
-      Kernel::Literal* lit = formulaToLiteral(body);
-      if (lit) {
-        Lib::Stack<Kernel::Literal*> lits;
-        lits.push(lit);
-        Kernel::Inference inf(NonspecificInference1(InferenceRule::CLAUSIFY, parent));
-        out.push_back(Kernel::Clause::fromStack(lits, inf));
-      }
-      break;
-    }
-
-    case OR: {
-      Lib::Stack<Kernel::Literal*> lits;
-      bool allLiterals = true;
-      FormulaList::Iterator it(body->args());
-      while (it.hasNext()) {
-        Kernel::Literal* lit = formulaToLiteral(it.next());
-        if (!lit) { allLiterals = false; break; }
-        lits.push(lit);
-      }
-      if (allLiterals) {
-        Kernel::Inference inf(NonspecificInference1(InferenceRule::CLAUSIFY, parent));
-        out.push_back(Kernel::Clause::fromStack(lits, inf));
-      }
-      break;
-    }
-
-    case AND: {
-      FormulaList::Iterator it(body->args());
-      while (it.hasNext()) {
-        extractClausesFromBody(it.next(), parent, out);
-      }
-      break;
-    }
-
-    case IFF: {
-      Kernel::Formula* left = body->left();
-      Kernel::Formula* right = body->right();
-      Kernel::Formula* imp1 = new Kernel::BinaryFormula(IMP, left, right);
-      Kernel::Formula* imp2 = new Kernel::BinaryFormula(IMP, right, left);
-      extractClausesFromBody(imp1, parent, out);
-      extractClausesFromBody(imp2, parent, out);
-      break;
-    }
-
-    case IMP: {
-      Kernel::Formula* left = body->left();
-      Kernel::Formula* right = body->right();
-      if (right->connective() == AND) {
-        Kernel::FormulaList::Iterator it(right->args());
-        while (it.hasNext()) {
-          Kernel::Formula* impSingle = new Kernel::BinaryFormula(IMP, left, it.next());
-          extractClausesFromBody(impSingle, parent, out);
-        }
-      } else if (left->connective() == AND) {
-        Lib::Stack<Kernel::Literal*> lits;
-        bool ok = true;
-        Kernel::FormulaList::Iterator it(left->args());
-        while (it.hasNext()) {
-          Kernel::Literal* l = formulaToLiteral(it.next());
-          if (!l) { ok = false; break; }
-          lits.push(Kernel::Literal::create(l, !l->polarity()));
-        }
-        if (ok) {
-          if (right->connective() == LITERAL || (right->connective() == NOT && right->uarg()->connective() == LITERAL)) {
-            Kernel::Literal* rlit = formulaToLiteral(right);
-            if (rlit) lits.push(rlit);
-            else ok = false;
-          } else if (right->connective() == OR) {
-            Kernel::FormulaList::Iterator rit(right->args());
-            while (rit.hasNext()) {
-              Kernel::Literal* rlit = formulaToLiteral(rit.next());
-              if (!rlit) { ok = false; break; }
-              lits.push(rlit);
-            }
-          } else {
-            ok = false;
-          }
-        }
-        if (ok) {
-          Kernel::Inference inf(NonspecificInference1(InferenceRule::CLAUSIFY, parent));
-          out.push_back(Kernel::Clause::fromStack(lits, inf));
-        }
-      } else {
-        Lib::Stack<Kernel::Literal*> lits;
-        Kernel::Literal* lLit = formulaToLiteral(left);
-        if (lLit) {
-          lits.push(Kernel::Literal::create(lLit, !lLit->polarity()));
-          bool okRight = true;
-          if (right->connective() == LITERAL || (right->connective() == NOT && right->uarg()->connective() == LITERAL)) {
-            Kernel::Literal* rlit = formulaToLiteral(right);
-            if (rlit) lits.push(rlit);
-            else okRight = false;
-          } else if (right->connective() == OR) {
-            Kernel::FormulaList::Iterator rit(right->args());
-            while (rit.hasNext()) {
-              Kernel::Literal* rlit = formulaToLiteral(rit.next());
-              if (!rlit) { okRight = false; break; }
-              lits.push(rlit);
-            }
-          } else {
-            okRight = false;
-          }
-          if (okRight) {
-            Kernel::Inference inf(NonspecificInference1(InferenceRule::CLAUSIFY, parent));
-            out.push_back(Kernel::Clause::fromStack(lits, inf));
-          }
-        }
-      }
-      break;
-    }
-
-    default:
-      break;
-  }
-}
-
-/**
- * @brief Dato un FormulaUnit di Tipo 3 (∀x∀y. corpo), estrae le clausole del corpo.
- */
-void Lemma4::extractType3Clauses(Kernel::FormulaUnit* fu, std::vector<Kernel::Clause*>& out)
-{
-  Kernel::Formula* matrix = stripForallXY(fu->formula());
-  if (!matrix) return;
-
-  extractClausesFromBody(matrix, fu, out);
-}
-
-static std::string getClauseKey(Kernel::Clause* cl) {
-  if (!cl) return "";
-  std::vector<std::string> lits;
-  lits.reserve(cl->length());
-  for (unsigned i = 0; i < cl->length(); i++) {
-    lits.push_back((*cl)[i]->toString());
-  }
-  std::sort(lits.begin(), lits.end());
-  std::string res;
-  for (const auto& s : lits) {
-    res += s + " | ";
-  }
-  return res;
-}
-
-/**
- * @brief Lemma 4: saturazione parziale per risoluzione ristretta.
- */
 void Lemma4::applyLemma4(Kernel::Problem &prb)
 {
-  FO2Logger::logDebug("[Lemma 4] INIZIO APPLICAZIONE LEMMA 4");
+  FO2Logger::logDebug("[Lemma 4] Starting restricted resolution saturation");
 
-  std::vector<Kernel::Clause*> clauses2;
-  std::deque<Kernel::Clause*> passive3;
-  std::vector<Kernel::Clause*> active3;
-  std::vector<Kernel::Unit*> nonClauseUnits;
+  // Lemma 4's restricted resolution uses canonical variable IDs 0 and 1.
+  // Formula rectification handles quantified formulas; clause units need a
+  // separate alpha-renaming because Shell::Rectify does not rectify clauses.
+  Shell::Rectify::rectify(prb.units());
+  UnitList::DelIterator normalizeIt(prb.units());
+  while (normalizeIt.hasNext()) {
+    Unit *unit = normalizeIt.next();
+    if (!unit->isClause()) continue;
+    Clause *clause = static_cast<Clause *>(unit);
+    Clause *normalized = normalizeClauseVariables(clause);
+    if (normalized != clause) normalizeIt.replace(normalized);
+  }
+
+  std::vector<Clause *> type3;
+  std::vector<Type2Clause> type2;
+  std::vector<Clause *> ordinaryClauses;
+  std::vector<Unit *> retainedUnits;
+  std::vector<FormulaUnit *> type2Units;
+  std::unordered_map<FormulaUnit *, std::vector<Clause *>> type2Additions;
+  std::unordered_map<FormulaUnit *, std::unordered_set<std::string>> knownType2Resolvents;
 
   UnitList::DelIterator it(prb.units());
   while (it.hasNext()) {
-    Kernel::Unit* unit = it.next();
+    Unit *unit = it.next();
     if (unit->isClause()) {
-      Kernel::Clause* cl = static_cast<Kernel::Clause*>(unit);
-
-      bool hasBinaryNonEq = false;
-      bool hasEq = false;
-      for (unsigned i = 0; i < cl->length(); i++) {
-        Kernel::Literal* lit = (*cl)[i];
-        if (lit->isEquality()) hasEq = true;
-        else if (isBinaryLiteral(lit)) hasBinaryNonEq = true;
+      Clause *clause = static_cast<Clause *>(unit);
+      bool hasTwoVar = false;
+      for (unsigned i = 0; i < clause->length(); ++i) {
+        if (!(*clause)[i]->isEquality() && containsBothVariables((*clause)[i])) hasTwoVar = true;
       }
+      if (hasTwoVar) type3.push_back(clause);
+      else ordinaryClauses.push_back(clause);
+      continue;
+    }
 
-      if (hasBinaryNonEq || hasEq) {
-        passive3.push_back(cl);
-      } else {
-        clauses2.push_back(cl);
+    FormulaUnit *formulaUnit = static_cast<FormulaUnit *>(unit);
+    std::vector<Clause *> extracted3;
+    if (extractType3(formulaUnit, extracted3)) {
+      type3.insert(type3.end(), extracted3.begin(), extracted3.end());
+      continue; // Replace the Type 3 formula by its CNF clauses.
+    }
+
+    std::vector<Clause *> extracted2;
+    unsigned x = 0, y = 0;
+    if (extractType2(formulaUnit, extracted2, x, y)) {
+      for (Clause *clause : extracted2) {
+        type2.push_back({clause, formulaUnit, x, y});
+        knownType2Resolvents[formulaUnit].insert(clauseKey(clause));
       }
-    } else {
-      Kernel::FormulaUnit* fu = static_cast<Kernel::FormulaUnit*>(unit);
-      nonClauseUnits.push_back(unit);
+      type2Units.push_back(formulaUnit);
+      continue;
+    }
 
-      std::vector<Kernel::Clause*> extracted;
-      extractType3Clauses(fu, extracted);
+    retainedUnits.push_back(unit);
+  }
 
-      if (!extracted.empty()) {
-        for (Kernel::Clause* cl : extracted) {
-          bool hasBinaryNonEq = false;
-          bool hasEq = false;
-          for (unsigned i = 0; i < cl->length(); i++) {
-            Kernel::Literal* lit = (*cl)[i];
-            if (lit->isEquality()) hasEq = true;
-            else if (isBinaryLiteral(lit)) hasBinaryNonEq = true;
-          }
+  std::unordered_set<std::string> knownType3;
+  std::deque<Clause *> passive3;
+  std::vector<Clause *> active3;
+  for (Clause *clause : type3) {
+    if (knownType3.insert(clauseKey(clause)).second) passive3.push_back(clause);
+  }
 
-          if (hasBinaryNonEq || hasEq) {
-            passive3.push_back(cl);
-          } else {
-            clauses2.push_back(cl);
-          }
+  while (!passive3.empty()) {
+    Clause *given = passive3.front();
+    passive3.pop_front();
+
+    std::vector<Clause *> sameTypeResolvents;
+    for (Clause *active : active3) resolveRestricted(given, active, sameTypeResolvents);
+    for (Clause *resolvent : sameTypeResolvents) {
+      if (knownType3.insert(clauseKey(resolvent)).second) passive3.push_back(resolvent);
+    }
+
+    active3.push_back(given);
+  }
+
+  // Once Type 3 is saturated, close the cross-resolution relation as well.
+  // A newly derived Type 2 clause must be checked against every Type 3 clause,
+  // including those processed before that resolvent was produced.
+  std::deque<size_t> pendingType2;
+  for (size_t i = 0; i < type2.size(); ++i) pendingType2.push_back(i);
+  while (!pendingType2.empty()) {
+    const Type2Clause parent = type2[pendingType2.front()];
+    pendingType2.pop_front();
+    for (Clause *type3Clause : active3) {
+      std::vector<Clause *> resolvents;
+      resolveRestricted(type3Clause, parent.clause, resolvents);
+      for (Clause *resolvent : resolvents) {
+        Clause *guardedResolvent = simplifyType2ClauseUnderDistinct(resolvent, parent.x, parent.y);
+        if (!guardedResolvent) continue;
+        std::string key = clauseKey(guardedResolvent);
+        auto &knownForOwner = knownType2Resolvents[parent.owner];
+        if (knownForOwner.insert(key).second) {
+          Type2Clause derived{guardedResolvent, parent.owner, parent.x, parent.y};
+          type2.push_back(derived);
+          type2Additions[parent.owner].push_back(guardedResolvent);
+          pendingType2.push_back(type2.size() - 1);
         }
       }
     }
   }
 
-  FO2Logger::logDebug("[Lemma 4] Clausole Tipo 2: " + std::to_string(clauses2.size()) + ", Clausole Tipo 3 (passive): " + std::to_string(passive3.size()));
+  UnitList *result = UnitList::empty();
+  for (Unit *unit : retainedUnits) UnitList::push(unit, result);
+  for (FormulaUnit *unit : type2Units) {
+    UnitList::push(addType2Resolvents(unit, type2Additions[unit]), result);
+  }
+  for (Clause *clause : ordinaryClauses) UnitList::push(clause, result);
 
-  std::unordered_set<std::string> knownKeys;
-  for (auto* cl : passive3) knownKeys.insert(getClauseKey(cl));
-  for (auto* cl : clauses2)  knownKeys.insert(getClauseKey(cl));
-
-  while (!passive3.empty()) {
-    Kernel::Clause* given = passive3.front();
-    passive3.pop_front();
-
-    std::vector<Kernel::Clause*> newResolvents;
-
-    for (Kernel::Clause* active : active3) {
-      resolveRestricted(given, active, newResolvents);
-    }
-
-    std::vector<Kernel::Clause*> newType2Resolvents;
-    for (Kernel::Clause* cl2 : clauses2) {
-      resolveRestricted(given, cl2, newType2Resolvents);
-    }
-    for (Kernel::Clause* res : newType2Resolvents) {
-      std::string key = getClauseKey(res);
-      if (knownKeys.find(key) == knownKeys.end()) {
-        knownKeys.insert(key);
-        clauses2.push_back(res);
-      }
-    }
-
-    active3.push_back(given);
-
-    for (Kernel::Clause* res : newResolvents) {
-      std::string key = getClauseKey(res);
-      if (knownKeys.find(key) == knownKeys.end()) {
-        knownKeys.insert(key);
-        passive3.push_back(res);
-      }
-    }
+  // Keep precisely the Type 3 clauses without non-equality binary literals.
+  for (Clause *clause : active3) {
+    if (!isType3RemovalCandidate(clause)) UnitList::push(clause, result);
   }
 
-  FO2Logger::logDebug("[Lemma 4] Saturazione completata. Clausole Tipo 3 sature: " + std::to_string(active3.size()));
-
-  std::vector<Kernel::Clause*> phi4 = active3;
-
-  FO2Logger::logDebug("[Lemma 4] (phi_4): " + std::to_string(phi4.size()) + " clausole Tipo 3");
-
-  UnitList* newUnits = UnitList::empty();
-
-  for (Kernel::Clause* cl : phi4) {
-    UnitList::push(cl, newUnits);
-  }
-  for (Kernel::Clause* cl : clauses2) {
-    UnitList::push(cl, newUnits);
-  }
-  for (Kernel::Unit* u : nonClauseUnits) {
-    UnitList::push(u, newUnits);
-  }
-
-  prb.units() = newUnits;
-
-  FO2Logger::logDebug("[Lemma 4] FINE LEMMA 4");
+  prb.units() = result;
+  FO2Logger::logDebug("[Lemma 4] Restricted resolution and Type 3 reduction complete");
 }
 
 } // namespace Lemmata

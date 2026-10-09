@@ -22,8 +22,7 @@ public:
 
 private:
   static Kernel::Formula* replaceVarWithTerm(Kernel::Formula* formula, unsigned varIndex, Kernel::TermList term);
-  static Kernel::Formula* extractZetaFromUniqueness(Kernel::Formula* formula);
-  static Kernel::Formula* replaceUniquenessWithFormula(Kernel::Formula* formula, Kernel::Formula* replacement);
+  static Kernel::Formula* replaceUniquenessOccurrences(Kernel::Formula* formula, bool& changed);
   static void generateCongruenceAxioms(Kernel::Formula* zetaI, Kernel::TermList constTerm, Kernel::FormulaList* &axioms);
 };
 

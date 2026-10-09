@@ -39,9 +39,8 @@ bool FO2Inferences::resolve(const IndexedClause& icl1, size_t litIdx1,
     IndexedLiteral ilit(subbedLit, icl1[i].index);
     bool dup = false;
     for (auto& existing : resLits) {
-      if (existing.literal == ilit.literal) { 
-        dup = true; 
-        if (ilit.index > existing.index) existing.index = ilit.index;
+      if (existing.literal == ilit.literal && existing.index == ilit.index) {
+        dup = true;
         break; 
       }
     }
@@ -55,16 +54,16 @@ bool FO2Inferences::resolve(const IndexedClause& icl1, size_t litIdx1,
     IndexedLiteral ilit(subbedLit, icl2[i].index);
     bool dup = false;
     for (auto& existing : resLits) {
-      if (existing.literal == ilit.literal) { 
-        dup = true; 
-        if (ilit.index > existing.index) existing.index = ilit.index;
+      if (existing.literal == ilit.literal && existing.index == ilit.index) {
+        dup = true;
         break; 
       }
     }
     if (!dup) resLits.push_back(ilit);
   }
 
-  // Tautology check: if resolvent contains complementary literals with same index
+  // Tautology check: complementary literals make the resolvent tautological,
+  // irrespective of their proof indices.
   for (size_t i = 0; i < resLits.size(); ++i) {
     for (size_t j = i + 1; j < resLits.size(); ++j) {
       if (Literal::complementaryLiteral(resLits[i].literal) == resLits[j].literal) {
@@ -100,14 +99,15 @@ bool FO2Inferences::factor(const IndexedClause& icl, size_t litIdx1, size_t litI
 
   std::vector<IndexedLiteral> factorLits;
   for (size_t i = 0; i < icl.length(); ++i) {
-    if (i == litIdx2) continue;
+    // The factoring rule keeps the non-selected literal A2 and removes the
+    // selected literal A1.
+    if (i == litIdx1) continue;
     Literal* subbedLit = subst.apply(icl[i].literal, 0);
     IndexedLiteral ilit(subbedLit, icl[i].index);
     bool dup = false;
     for (auto& existing : factorLits) {
-      if (existing.literal == ilit.literal) { 
-        dup = true; 
-        if (ilit.index > existing.index) existing.index = ilit.index;
+      if (existing.literal == ilit.literal && existing.index == ilit.index) {
+        dup = true;
         break; 
       }
     }
@@ -157,176 +157,6 @@ bool FO2Inferences::subsumes(const IndexedClause& icl1, const IndexedClause& icl
 
   RobSubstitution subst;
   return matchSubsumptionLiterals(0, icl1, icl2, subst);
-}
-
-bool FO2Inferences::split(const IndexedClause& icl, IndexedClause& outR1, IndexedClause& outR2)
-{
-  const size_t len = icl.length();
-  if (len <= 1) return false;
-
-  std::vector<DHSet<unsigned>> litVars(len);
-  std::vector<bool> hasVars(len, false);
-  for (size_t i = 0; i < len; ++i) {
-    if (icl[i].literal) {
-      VariableIterator vit(icl[i].literal);
-      while (vit.hasNext()) {
-        litVars[i].insert(vit.next().var());
-        hasVars[i] = true;
-      }
-    }
-  }
-
-  std::vector<int> component(len, -1);
-  int compCount = 0;
-
-  // Definition 6 (2): a clause with a (non-propositional) ground literal must be ground.
-  // A clause mixing ground literals with literals containing variables is therefore split
-  // into its ground part and its non-ground part (linked by a fresh propositional symbol
-  // added by the caller).
-  {
-    std::vector<IndexedLiteral> groundLits;
-    std::vector<IndexedLiteral> nonGroundLits;
-    for (size_t i = 0; i < len; ++i) {
-      if (icl[i].literal && !hasVars[i] && icl[i].literal->arity() > 0) {
-        groundLits.push_back(icl[i]);
-      } else {
-        nonGroundLits.push_back(icl[i]);
-      }
-    }
-    bool hasNonGroundWithVars = false;
-    for (size_t i = 0; i < len; ++i) {
-      if (hasVars[i]) { hasNonGroundWithVars = true; break; }
-    }
-    if (!groundLits.empty() && hasNonGroundWithVars) {
-      outR1 = IndexedClause(nonGroundLits);
-      outR2 = IndexedClause(groundLits);
-      return true;
-    }
-  }
-
-  // Ground literals (no variables, e.g. the propositional split symbols) are
-  // not considered as components of their own: otherwise a clause such as
-  // `C | sP_split_n` would be split again and again forever. They are
-  // attached to component 0 below.
-  for (size_t i = 0; i < len; ++i) {
-    if (!hasVars[i]) continue;
-    if (component[i] != -1) continue;
-    component[i] = compCount;
-
-    std::vector<size_t> queue;
-    queue.push_back(i);
-    size_t qHead = 0;
-
-    while (qHead < queue.size()) {
-      size_t curr = queue[qHead++];
-      for (size_t j = 0; j < len; ++j) {
-        if (component[j] != -1) continue;
-        bool share = false;
-        DHSet<unsigned>::Iterator it(litVars[curr]);
-        while (it.hasNext()) {
-          if (litVars[j].contains(it.next())) {
-            share = true;
-            break;
-          }
-        }
-        if (share) {
-          component[j] = compCount;
-          queue.push_back(j);
-        }
-      }
-    }
-    compCount++;
-  }
-
-  if (compCount <= 1) {
-    return false;
-  }
-
-  std::vector<IndexedLiteral> r1Lits;
-  std::vector<IndexedLiteral> r2Lits;
-
-  for (size_t i = 0; i < len; ++i) {
-    if (component[i] == 0 || component[i] == -1) {
-      r1Lits.push_back(icl[i]);
-    } else {
-      r2Lits.push_back(icl[i]);
-    }
-  }
-
-  outR1 = IndexedClause(r1Lits);
-  outR2 = IndexedClause(r2Lits);
-  return true;
-}
-
-bool FO2Inferences::simplifyEqualityClause(const IndexedClause& inIcl, IndexedClause& outIcl, bool& outIsTautology)
-{
-  outIsTautology = false;
-  std::vector<IndexedLiteral> currentLits = inIcl.literals();
-  bool modified = true;
-
-  while (modified) {
-    modified = false;
-
-    // 1. Check for tautology x = x (positive equality reflexivity)
-    for (size_t i = 0; i < currentLits.size(); ++i) {
-      Literal* lit = currentLits[i].literal;
-      if (lit && lit->isEquality()) {
-        TermList t1 = *lit->nthArgument(0);
-        TermList t2 = *lit->nthArgument(1);
-        if (lit->isPositive()) {
-          if (t1.sameContent(&t2)) {
-            outIsTautology = true;
-            outIcl = IndexedClause();
-            return true;
-          }
-        }
-      }
-    }
-
-    // 2. Perform Equality Resolution on negative equality literals (t1 != t2)
-    for (size_t i = 0; i < currentLits.size(); ++i) {
-      Literal* lit = currentLits[i].literal;
-      if (lit && lit->isEquality() && !lit->isPositive()) {
-        TermList t1 = *lit->nthArgument(0);
-        TermList t2 = *lit->nthArgument(1);
-
-        RobSubstitution subst;
-        if (subst.unify(t1, 0, t2, 0)) {
-          std::vector<IndexedLiteral> newLits;
-          for (size_t j = 0; j < currentLits.size(); ++j) {
-            if (i == j) continue;
-            Literal* origLit = currentLits[j].literal;
-            Literal* newLit = subst.apply(origLit, 0);
-            newLits.push_back(IndexedLiteral(newLit, currentLits[j].index));
-          }
-          currentLits = newLits;
-          modified = true;
-          break;
-        }
-      }
-    }
-  }
-
-  // 3. Convert any remaining equality literals to eq0/neq0 predicates
-  static unsigned eq0Functor = env.signature->addPredicate("eq0", 2);
-  static unsigned neq0Functor = env.signature->addPredicate("neq0", 2);
-
-  for (size_t i = 0; i < currentLits.size(); ++i) {
-    Literal* lit = currentLits[i].literal;
-    if (lit && lit->isEquality()) {
-      TermList args[2] = {*lit->nthArgument(0), *lit->nthArgument(1)};
-      Literal* proxyLit = nullptr;
-      if (lit->isPositive()) {
-        proxyLit = Literal::create(eq0Functor, 2, true, args);
-      } else {
-        proxyLit = Literal::create(neq0Functor, 2, true, args);
-      }
-      currentLits[i] = IndexedLiteral(proxyLit, currentLits[i].index);
-    }
-  }
-
-  IndexedClause tempIcl(currentLits);
-  return normalizeVariables(tempIcl, outIcl);
 }
 
 bool FO2Inferences::normalizeVariables(const IndexedClause& inIcl, IndexedClause& outIcl)
@@ -404,7 +234,7 @@ bool FO2Inferences::checkS2Invariant(const IndexedClause& icl, std::string& outR
       litVars.insert(lvit.next().var());
     }
 
-    if (litVars.size() == 0 && lit->arity() > 0) {
+    if (litVars.size() == 0) {
       hasGroundLiteral = true;
     } else if (litVars.size() > 0) {
       hasNonGroundLiteral = true;
@@ -473,17 +303,18 @@ bool FO2Inferences::checkIndexInvariant(const IndexedClause& icl, std::string& o
     collectVars(icl[i].literal, clauseVars);
   }
 
+  // Definition 7 constrains indices only in two-variable clauses. In
+  // particular, a derived one-variable clause may retain both index 0 and
+  // index 1 copies of the same literal.
+  if (clauseVars.size() < 2) return true;
+
   for (size_t i = 0; i < icl.length(); ++i) {
     DHSet<unsigned> litVars;
     collectVars(icl[i].literal, litVars);
     const bool expectedOne = clauseVars.size() == 2 && litVars.size() == 2;
     if ((icl[i].index == 1) != expectedOne) {
-      if (clauseVars.size() != 2) {
-        outReason = "Lemma10(outside scope): index 1 left in a clause with at most 1 variable";
-      } else {
-        outReason = expectedOne ? "Lemma10: two-variable literal without index 1"
-                                : "Lemma10: index 1 on a literal that is not two-variable";
-      }
+      outReason = expectedOne ? "Lemma10: two-variable literal without index 1"
+                              : "Lemma10: index 1 on a literal that is not two-variable";
       return false;
     }
   }

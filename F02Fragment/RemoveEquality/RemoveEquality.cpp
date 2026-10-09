@@ -254,16 +254,16 @@ void RemoveEquality::removeEquality(Kernel::Problem &prb)
 
   FO2Logger::logLemma("AFTER LEMMA 6", prb);
 
-  // Final Pass: Replace any remaining equality literals (= / !=) with proxy predicate eq0
-  replaceEqualityWithProxy(prb);
+  // Lemma 6 is expected to have eliminated every equality occurrence.
+  // Keep the proxy conversion available for diagnostics/manual use, but do not
+  // silently turn any missed equality into an uninterpreted predicate here.
+  // replaceEqualityWithProxy(prb);
 
   FO2Logger::logPhase("Equality removal completed");
 }
 
 void RemoveEquality::replaceEqualityWithProxy(Kernel::Problem &prb)
 {
-  bool replacedAnyEq = false;
-
   UnitList::DelIterator eqProxyIt(prb.units());
   while (eqProxyIt.hasNext()) {
     Unit* u = eqProxyIt.next();
@@ -272,7 +272,6 @@ void RemoveEquality::replaceEqualityWithProxy(Kernel::Problem &prb)
       Formula* newForm = replaceEqInFormula(fu->formula());
       FormulaUnit* targetFu = fu;
       if (newForm != fu->formula()) {
-        replacedAnyEq = true;
         targetFu = new FormulaUnit(newForm, fu->inference());
       }
       FormulaUnit* simpFu = Shell::SimplifyFalseTrue::simplify(targetFu);
@@ -290,6 +289,11 @@ void RemoveEquality::replaceEqualityWithProxy(Kernel::Problem &prb)
     }
   }
 
+  // Temporarily disabled: the equality-removal pipeline should produce an
+  // equality-free formula, and the Resolution module must not depend on an
+  // ad-hoc equality proxy theory. Keep this block for reference while the
+  // remaining eq0 conversion is reviewed.
+#if 0
   if (replacedAnyEq || s_eqProxySymbol != 0) {
     if (s_eqProxySymbol == 0) {
       s_eqProxySymbol = env.signature->addFreshPredicate(2, "eq0");
@@ -332,6 +336,7 @@ void RemoveEquality::replaceEqualityWithProxy(Kernel::Problem &prb)
       }
     }
   }
+#endif
 }
 
 void RemoveEquality::traceProblem(Kernel::Problem &prb)

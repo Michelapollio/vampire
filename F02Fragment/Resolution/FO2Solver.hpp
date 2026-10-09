@@ -23,7 +23,7 @@ class FO2Solver {
 public:
   /**
    * @brief Solves an FO2 problem.
-   * Returns SATISFIABLE or UNSATISFIABLE.
+   * Returns SATISFIABLE, UNSATISFIABLE, or UNKNOWN when a resource/input limit is reached.
    */
   static FO2Result solve(Kernel::Problem& prb);
 };

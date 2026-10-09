@@ -6,7 +6,8 @@
 namespace FO2Fragment {
 
 /**
- * @brief Implementation of Lemma 3 (Conversion of Scott Type 2 formulas into Type 3 via Skolemization).
+ * @brief Implements Lemma 3 from de Nivelle and Pratt-Hartmann: move equality
+ *        out of the CNF matrices of Scott-normal-form formulas.
  */
 class Lemma3 {
 public:

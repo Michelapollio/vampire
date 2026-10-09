@@ -28,6 +28,7 @@
 #include "Lib/StringUtils.hpp"
 #include "Lib/Sys/Multiprocessing.hpp"
 #include "Lib/Int.hpp"
+#include "Lib/Stack.hpp"
 
 #include "Kernel/Clause.hpp"
 #include "Kernel/Formula.hpp"
@@ -470,7 +471,7 @@ void fo2Mode(Problem* problem)
 {
   ScopedPtr<Problem> prb(problem);
 
-  FO2Fragment::FO2Logger::setVerbosity(FO2Fragment::VerbosityLevel::DEBUG);
+  FO2Fragment::FO2Logger::setVerbosity(FO2Fragment::VerbosityLevel::QUIET);
 
   bool hasEq = false;
   bool isFO2 = FO2Fragment::Classifier::isFO2(prb->units(), hasEq);
@@ -480,22 +481,26 @@ void fo2Mode(Problem* problem)
     return;
   }
 
-  if (!hasEq && !prb->hasEquality()) {
+  const bool inputHasEquality = hasEq || prb->hasEquality();
+  if (!inputHasEquality) {
     std::cout << "[FO2] Il problema appartiene al frammento FO2 e NON contiene uguaglianze. I lemmata vengono saltati.\n";
   } else {
     FO2Fragment::FO2Logger::logPhase("Inizio procedura di rimozione dell'uguaglianza per frammento FO2");
     FO2Fragment::RemoveEquality::removeEquality(*prb);
+    if (prb->hasEquality()) {
+      std::cout << "% [FO2] Equality removal left equality in the problem; FO2 resolution is skipped.\n";
+      env.statistics->terminationReason = TerminationReason::UNKNOWN;
+      std::cout << "% SZS status Unknown for " << env.options->problemName() << std::endl;
+      vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
+      return;
+    }
   }
 
   FO2Fragment::FO2Logger::logPhase("Inizio Preprocessing FO2 (NNF/Clausificazione/Scott Normal Form)");
   bool isS2Valid = FO2Preprocessor::Preprocessor::preprocess(*prb);
 
   if (!isS2Valid) {
-    FO2Fragment::FO2Logger::logPhase("FO2 Preprocessor: S2 invariant violation detected. Returning Unknown.");
-    env.statistics->terminationReason = TerminationReason::UNKNOWN;
-    std::cout << "% SZS status Unknown for " << env.options->problemName() << std::endl;
-    vampireReturnValue = VAMP_RESULT_STATUS_SUCCESS;
-    return;
+    FO2Fragment::FO2Logger::logPhase("FO2 Preprocessor: clauses need validation/splitting by the FO2 solver before saturation.");
   }
 
   FO2Fragment::FO2Logger::logAlways("STATO FINALE DEL PROBLEMA", *prb);
@@ -558,10 +563,15 @@ void fo2RemoveEqualityMode(Problem* problem)
     return;
   }
 
-  if (!hasEq && !prb->hasEquality()) {
+  const bool inputHasEquality = hasEq || prb->hasEquality();
+  if (!inputHasEquality) {
     std::cout << "% [FO2] Il problema appartiene al frammento FO2 e NON contiene uguaglianze. I lemmata vengono saltati.\n";
   } else {
+    FO2Fragment::FO2Logger::logPhase("Inizio procedura di rimozione dell'uguaglianza per frammento FO2");
     FO2Fragment::RemoveEquality::removeEquality(*prb);
+    if (prb->hasEquality()) {
+      std::cout << "% [FO2_REMOVE_EQUALITY] Equality removal left equality in the problem; Classic Otter will receive the transformed problem with equality.\n";
+    }
   }
 
   // Configura automaticamente l'algoritmo Otter classico per fo2_remove_equality
@@ -579,7 +589,16 @@ UnitList* cloneUnitsForStep(UnitList* units) {
   UnitList* res = UnitList::empty();
   UnitList::Iterator it(units);
   while (it.hasNext()) {
-    UnitList::push(it.next(), res);
+    Unit *unit = it.next();
+    if (unit->isClause()) {
+      Clause *clause = static_cast<Clause *>(unit);
+      Stack<Literal *> literals;
+      for (unsigned i = 0; i < clause->length(); ++i) literals.push((*clause)[i]);
+      UnitList::push(Clause::fromStack(literals, clause->inference()), res);
+    } else {
+      FormulaUnit *formulaUnit = static_cast<FormulaUnit *>(unit);
+      UnitList::push(new FormulaUnit(formulaUnit->formula(), formulaUnit->inference()), res);
+    }
   }
   return UnitList::reverse(res);
 }
@@ -624,7 +643,8 @@ void fo2StepByStepMode(Problem* problem)
     "Passo 3 (Dopo Lemma 3)          ",
     "Passo 4 (Dopo Lemma 4)          ",
     "Passo 5 (Dopo Lemma 5)          ",
-    "Passo 6 (Dopo Lemma 6 + Proxy)  ",
+    "Passo 6 (Dopo Lemma 6)          ",
+    "Passo 7 (Dopo Proxy Eq)        ",
   };
   std::vector<std::string> results;
   std::vector<double> times;
@@ -679,7 +699,7 @@ void fo2StepByStepMode(Problem* problem)
     std::cout << p5It.next()->toString() << "\n";
   }
 
-  // Passo 6: Lemma 6 + Proxy Eq
+  // Passo 6: Lemma 6, before the optional diagnostic proxy conversion.
   FO2Fragment::Lemmata::Lemma6::applyLemma6(*prb);
 
   std::cout << "--- FORMULE DOPO LEMMA 6 (prima di proxy) ---\n";
@@ -687,12 +707,20 @@ void fo2StepByStepMode(Problem* problem)
   while (p6aIt.hasNext()) {
     std::cout << p6aIt.next()->toString() << "\n";
   }
-  FO2Fragment::RemoveEquality::replaceEqualityWithProxy(*prb);
   double t6 = 0;
   std::string res6 = testEquisatWithClassicSolver(prb->units(), t6);
   results.push_back(res6);
   times.push_back(t6);
   std::cout << "[DIAGNOSTIC] " << stepNames[6] << ": " << res6 << " (" << t6 << "s)\n";
+
+  // Passo 7: optional proxy conversion, measured separately because it is
+  // diagnostic-only and its proxy theory is currently disabled.
+  FO2Fragment::RemoveEquality::replaceEqualityWithProxy(*prb);
+  double t7 = 0;
+  std::string res7 = testEquisatWithClassicSolver(prb->units(), t7);
+  results.push_back(res7);
+  times.push_back(t7);
+  std::cout << "[DIAGNOSTIC] " << stepNames[7] << ": " << res7 << " (" << t7 << "s)\n";
 
   std::cout << "\n===========================================================\n";
   std::cout << "TABELLA DI EQUISODDISFACIBILITÀ:\n";

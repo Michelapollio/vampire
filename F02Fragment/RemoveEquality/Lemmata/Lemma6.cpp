@@ -118,136 +118,85 @@ Formula* Lemma6::replaceVarWithTerm(Formula* formula, unsigned varIndex, TermLis
  * @brief Cerca ed estrae la sottoformula zeta(x) da una struttura di quantificatore d'unicita' (exists! x zeta(x)).
  */
 namespace {
-bool isUniquenessForall(Formula* f) {
+bool isLemma5UniquenessForall(Formula* f) {
   if (!f || f->connective() != FORALL) return false;
   Formula* arg = f->qarg();
-  if (!arg) return false;
-  if (arg->connective() == IMP) {
-    Formula* rhs = arg->right();
-    if (rhs && rhs->connective() == LITERAL && rhs->literal() && rhs->literal()->isEquality()) {
-      return true;
+  if (!arg || arg->connective() != IMP) return false;
+  Formula* lhs = arg->left();
+  Formula* rhs = arg->right();
+  if (!lhs || lhs->connective() != NOT || !lhs->uarg()) return false;
+  if (!rhs || rhs->connective() != LITERAL || !rhs->literal()) return false;
+  Literal* eq = rhs->literal();
+  if (!eq->isEquality() || !eq->polarity() || eq->arity() != 2) return false;
+  TermList first = *eq->nthArgument(0);
+  TermList second = *eq->nthArgument(1);
+  return first.isVar() && first.var() == 0 && second.isVar() && second.var() == 1;
+}
+Formula* lemma5Zeta(Formula* f)
+{
+  if (!f || f->connective() != EXISTS || !f->qarg() || f->qarg()->connective() != AND) return nullptr;
+  Formula* zeta = nullptr;
+  Formula* uniqueness = nullptr;
+  FormulaList::Iterator it(f->qarg()->args());
+  while (it.hasNext()) {
+    Formula* child = it.next();
+    if (isLemma5UniquenessForall(child)) {
+      if (uniqueness) return nullptr;
+      uniqueness = child;
+    } else if (!zeta && child->connective() == NOT) {
+      zeta = child;
+    } else {
+      return nullptr;
     }
   }
-  return false;
+  return zeta && uniqueness ? zeta : nullptr;
 }
 } // namespace
 
-Formula* Lemma6::extractZetaFromUniqueness(Formula* formula)
+Formula* Lemma6::replaceUniquenessOccurrences(Formula* formula, bool& changed)
 {
   if (!formula) return nullptr;
-
-  if (formula->connective() == EXISTS) {
-    Formula* body = formula->qarg();
-    if (body && body->connective() == AND) {
-      bool hasUniquenessForall = false;
-      Formula* candidateZeta = nullptr;
-      FormulaList::Iterator it(body->args());
-      while (it.hasNext()) {
-        Formula* child = it.next();
-        if (isUniquenessForall(child)) {
-          hasUniquenessForall = true;
-        } else {
-          candidateZeta = child;
-        }
-      }
-      if (hasUniquenessForall && candidateZeta) {
-        return candidateZeta;
-      }
-    }
-  }
-
-  switch (formula->connective()) {
-    case NOT:
-      return extractZetaFromUniqueness(formula->uarg());
-    case AND:
-    case OR: {
-      FormulaList::Iterator it(formula->args());
-      while (it.hasNext()) {
-        Formula* res = extractZetaFromUniqueness(it.next());
-        if (res) return res;
-      }
-      break;
-    }
-    case IMP:
-    case IFF:
-    case XOR:
-      break;
-    case FORALL:
-      return extractZetaFromUniqueness(formula->qarg());
-    default:
-      break;
-  }
-
-  return nullptr;
-}
-
-/**
- * @brief Sostituisce la sottoformula di quantificazione d'unicita' con la costante vera (TRUE) all'interno di una formula.
- */
-Formula* Lemma6::replaceUniquenessWithFormula(Formula* formula, Formula* replacement)
-{
-  if (!formula) return nullptr;
-
-  if (formula->connective() == EXISTS) {
-    Formula* body = formula->qarg();
-    if (body && body->connective() == AND) {
-      bool hasForall = false;
-      FormulaList::Iterator it(body->args());
-      while (it.hasNext()) {
-        if (it.next()->connective() == FORALL) {
-          hasForall = true;
-          break;
-        }
-      }
-      if (hasForall) {
-        return replacement;
-      }
-    }
+  if (Formula* zeta = lemma5Zeta(formula)) {
+    unsigned functor = env.signature->addFreshFunction(0, "e_");
+    env.signature->getFunction(functor)->setType(OperatorType::getConstantsType(AtomicSort::defaultSort()));
+    TermList constant(Term::createConstant(functor));
+    FormulaList* axioms = FormulaList::empty();
+    generateCongruenceAxioms(zeta, constant, axioms);
+    changed = true;
+    return JunctionFormula::generalJunction(AND, axioms);
   }
 
   switch (formula->connective()) {
     case NOT: {
-      Formula* newArg = replaceUniquenessWithFormula(formula->uarg(), replacement);
-      if (newArg != formula->uarg()) return new NegatedFormula(newArg);
-      return formula;
+      Formula* arg = replaceUniquenessOccurrences(formula->uarg(), changed);
+      return arg == formula->uarg() ? formula : new NegatedFormula(arg);
     }
     case AND:
     case OR: {
-      FormulaList* args = formula->args();
-      FormulaList* newArgs = FormulaList::empty();
-      bool changed = false;
-
-      FormulaList::Iterator it(args);
+      FormulaList* args = FormulaList::empty();
+      bool localChange = false;
+      FormulaList::Iterator it(formula->args());
       while (it.hasNext()) {
-        Formula* arg = it.next();
-        Formula* newArg = replaceUniquenessWithFormula(arg, replacement);
-        if (newArg != arg) changed = true;
-        FormulaList::push(newArg, newArgs);
+        Formula* oldArg = it.next();
+        Formula* newArg = replaceUniquenessOccurrences(oldArg, changed);
+        localChange |= newArg != oldArg;
+        FormulaList::push(newArg, args);
       }
-      newArgs = FormulaList::reverse(newArgs);
-
-      if (changed) {
-        return JunctionFormula::generalJunction(formula->connective(), newArgs);
-      }
-      FormulaList::destroy(newArgs);
-      return formula;
+      if (!localChange) { FormulaList::destroy(args); return formula; }
+      return JunctionFormula::generalJunction(formula->connective(), FormulaList::reverse(args));
     }
     case IMP:
     case IFF:
     case XOR: {
-      Formula* newLeft = replaceUniquenessWithFormula(formula->left(), replacement);
-      Formula* newRight = replaceUniquenessWithFormula(formula->right(), replacement);
-      if (newLeft != formula->left() || newRight != formula->right()) {
-        return new BinaryFormula(formula->connective(), newLeft, newRight);
-      }
-      return formula;
+      Formula* left = replaceUniquenessOccurrences(formula->left(), changed);
+      Formula* right = replaceUniquenessOccurrences(formula->right(), changed);
+      return left == formula->left() && right == formula->right() ? formula
+          : new BinaryFormula(formula->connective(), left, right);
     }
-    case FORALL: {
-      Formula* newQarg = replaceUniquenessWithFormula(formula->qarg(), replacement);
-      if (newQarg != formula->qarg()) {
-        return new QuantifiedFormula(formula->connective(), formula->vars(), newQarg);
-      }
-      return formula;
+    case FORALL:
+    case EXISTS: {
+      Formula* arg = replaceUniquenessOccurrences(formula->qarg(), changed);
+      return arg == formula->qarg() ? formula : new QuantifiedFormula(formula->connective(), formula->vars(), arg);
     }
     default:
       return formula;
@@ -333,28 +282,10 @@ void Lemma6::applyLemma6(Problem &prb)
     Unit* unit = it.next();
     if (!unit->isClause()) {
       FormulaUnit* fu = static_cast<FormulaUnit*>(unit);
-      Formula* zetaI = extractZetaFromUniqueness(fu->formula());
-
-      if (zetaI) {
+      bool changed = false;
+      Formula* cleanFormula = replaceUniquenessOccurrences(fu->formula(), changed);
+      if (changed) {
         createdConstants = true;
-        unsigned freshConstFunctor = env.signature->addFreshFunction(0, "e_");
-        env.signature->getFunction(freshConstFunctor)->setType(OperatorType::getConstantsType(AtomicSort::defaultSort()));
-        TermList constTerm = TermList(Term::createConstant(freshConstFunctor));
-
-        // Normalize all variables in zetaI to variable 0 (X0) to maintain 2-variable bound
-        Formula* normalizedZeta = zetaI;
-        for (unsigned v = 1; v < 16; ++v) {
-          normalizedZeta = replaceVarWithTerm(normalizedZeta, v, TermList::var(0));
-        }
-
-//        FO2Logger::logDebug("[Lemma 6] Trovata asserzione d'unicita' per zeta(x): " + normalizedZeta->toString());
-//        FO2Logger::logDebug("[Lemma 6] Generata costante fresca: " + env.signature->getFunction(freshConstFunctor)->name());
-
-        FormulaList* axioms = FormulaList::empty();
-        generateCongruenceAxioms(normalizedZeta, constTerm, axioms);
-
-        Formula* axiomsConj = JunctionFormula::generalJunction(AND, axioms);
-        Formula* cleanFormula = replaceUniquenessWithFormula(fu->formula(), axiomsConj);
         FormulaUnit* cleanUnit = new FormulaUnit(cleanFormula, Inference(FromInput(UnitInputType::AXIOM)));
         UnitList::push(cleanUnit, newUnits);
 

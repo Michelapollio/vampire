@@ -49,6 +49,8 @@ private:
 
 public:
   IndexedClause();
+  // Preserves the indices supplied by the inference rule. Initial clauses
+  // should use fromClause() to assign the S2+i indices.
   IndexedClause(const std::vector<IndexedLiteral>& lits, Kernel::Clause* origin = nullptr);
 
   size_t length() const { return _literals.size(); }
