@@ -19,7 +19,7 @@ public:
    * @param hasEq Set to true if equality literals are found in the problem.
    * @return true if the problem belongs to the FO2 fragment, false otherwise.
    */
-    static bool isFO2(UnitList *ul, bool &hasEq);
+  static bool isFO2(UnitList *ul, bool &hasEq);
 
 private:
   /**
