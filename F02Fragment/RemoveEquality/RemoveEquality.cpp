@@ -1,7 +1,6 @@
 #include "RemoveEquality.hpp"
 
 
-#include "Kernel/Clause.hpp"
 #include "Kernel/Formula.hpp"
 #include "Kernel/FormulaUnit.hpp"
 #include "Kernel/Problem.hpp"
@@ -12,13 +11,8 @@
 #include "Lib/DHSet.hpp"
 #include "Lib/List.hpp"
 
-#include "Shell/EqualityProxy.hpp"
-#include "Shell/EqualityProxyMono.hpp"
-#include "Shell/Options.hpp"
 #include "Shell/DistinctGroupExpansion.hpp"
 #include "Shell/Rectify.hpp"
-#include "Shell/NNF.hpp"
-#include "Shell/Flattening.hpp"
 #include "Shell/SimplifyFalseTrue.hpp"
 #include "Shell/TPTPPrinter.hpp"
 
@@ -232,21 +226,6 @@ void RemoveEquality::removeEquality(Kernel::Problem &prb)
   normalizeEqualitiesInProblem(prb);
   Shell::Rectify::rectify(prb.units());
 
-  // Convert formulas to NNF (Negation Normal Form) so negations are at literal level
-  // and implications/equivalences are expanded before Lemmata 1-6.
-  /*UnitList::DelIterator nnfIt(prb.units());
-  while (nnfIt.hasNext()) {
-    Unit* u = nnfIt.next();
-    if (!u->isClause()) {
-      FormulaUnit* fu = static_cast<FormulaUnit*>(u);
-      fu = Shell::Rectify::rectify(fu);
-      fu = Shell::NNF::nnf(fu);
-      fu = Shell::Flattening::flatten(fu);
-      fu = Shell::SimplifyFalseTrue::simplify(fu);
-      nnfIt.replace(fu);
-    }
-  }*/
-
   FO2Logger::logPhase("Starting equality removal procedure (RemoveEquality)");
 
   FO2Logger::logLemma("BEFORE LEMMA 1", prb);
@@ -279,7 +258,6 @@ void RemoveEquality::removeEquality(Kernel::Problem &prb)
   // Lemma 6 is expected to have eliminated every equality occurrence.
   // Keep the proxy conversion available for diagnostics/manual use, but do not
   // silently turn any missed equality into an uninterpreted predicate here.
-  // replaceEqualityWithProxy(prb);
 
   FO2Logger::logPhase("Equality removal completed");
 }
@@ -311,69 +289,6 @@ void RemoveEquality::replaceEqualityWithProxy(Kernel::Problem &prb)
     }
   }
 
-  // Temporarily disabled: the equality-removal pipeline should produce an
-  // equality-free formula, and the Resolution module must not depend on an
-  // ad-hoc equality proxy theory. Keep this block for reference while the
-  // remaining eq0 conversion is reviewed.
-#if 0
-  if (replacedAnyEq || s_eqProxySymbol != 0) {
-    if (s_eqProxySymbol == 0) {
-      s_eqProxySymbol = env.signature->addFreshPredicate(2, "eq0");
-    }
-
-    TermList var0 = TermList::var(0);
-    TermList var1 = TermList::var(1);
-    TermList args00[2] = {var0, var0};
-    TermList args01[2] = {var0, var1};
-    TermList args10[2] = {var1, var0};
-
-    // 1. Reflexivity: eq0(X0, X0)
-    Lib::Stack<Literal*> reflLits;
-    reflLits.push(Literal::create(s_eqProxySymbol, 2, true, args00));
-    Clause* reflCl = Clause::fromStack(reflLits, Inference(FromInput(UnitInputType::AXIOM)));
-    UnitList::push(reflCl, prb.units());
-
-    // 2. Symmetry: ~eq0(X0, X1) | eq0(X1, X0)
-    Lib::Stack<Literal*> symLits;
-    symLits.push(Literal::create(s_eqProxySymbol, 2, false, args01));
-    symLits.push(Literal::create(s_eqProxySymbol, 2, true, args10));
-    Clause* symCl = Clause::fromStack(symLits, Inference(FromInput(UnitInputType::AXIOM)));
-    UnitList::push(symCl, prb.units());
-
-    // 3. Predicate Congruence: ~eq0(X0, X1) | ~P(X0) | P(X1) for all unary predicates P
-    unsigned numPreds = env.signature->predicates();
-    for (unsigned p = 1; p < numPreds; ++p) {
-      if (p == s_eqProxySymbol || env.signature->isEqualityPredicate(p)) continue;
-      Signature::Symbol* sym = env.signature->getPredicate(p);
-      if (!sym || sym->interpreted()) continue;
-      if (sym->arity() == 1) {
-        TermList a0[1] = {var0};
-        TermList a1[1] = {var1};
-        Lib::Stack<Literal*> congLits;
-        congLits.push(Literal::create(s_eqProxySymbol, 2, false, args01));
-        congLits.push(Literal::create(p, 1, false, a0));
-        congLits.push(Literal::create(p, 1, true, a1));
-        Clause* congCl = Clause::fromStack(congLits, Inference(FromInput(UnitInputType::AXIOM)));
-        UnitList::push(congCl, prb.units());
-      }
-    }
-  }
-#endif
-}
-
-void RemoveEquality::traceProblem(Kernel::Problem &prb)
-{
-  (void)prb;
-}
-
-void RemoveEquality::traceFormula(Kernel::Formula *formula, int depth)
-{
-  (void)formula; (void)depth;
-}
-
-void RemoveEquality::traceClause(Kernel::Clause *cl)
-{
-  (void)cl;
 }
 
 } // namespace FO2Fragment
